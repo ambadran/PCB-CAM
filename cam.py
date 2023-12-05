@@ -4,8 +4,9 @@ Then uses shapely to create outline gcode and holes gcode.
 '''
 from __future__ import annotations
 import gerber
-from shapely import Point, MultiPoint, LineString, LinearRing, box
+from shapely import Point, MultiPoint, LineString, LinearRing, box, Polygon
 from matplotlib.patches import Ellipse
+from copy import deepcopy
 import turtle
 import random
 
@@ -112,7 +113,8 @@ class GerberToShapely:
         '''
 
         '''
-        return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter).exterior
+        # return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter/2).exterior
+        return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])])
 
     @classmethod
     def to_obround(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
@@ -219,7 +221,6 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     #     color = random.choice(colors)
 
     turtle.pencolor(color)
-
     coord_list = list(line_string.coords)
 
     turtle.up()
@@ -229,8 +230,8 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
         turtle.setpos((coord[0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
 
     turtle.setpos((coord_list[-1][0] - x_offset) * multiplier, (coord_list[-1][1] - y_offset) * multiplier)
-    if coord_list[0] == coord_list[-1]:
-        turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
+    # if coord_list[0] == coord_list[-1]:
+    #     turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
 
     # Graph.used_colors.add(color)
     # if len(Graph.used_colors) == len(colors):
@@ -240,6 +241,12 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     if terminate:
         turtle.done()
 
+
+def visualize_group(group):
+    for num, sth in enumerate(group[:-1]):
+        visualize(sth)
+        print(num)
+    visualize(group[-1])
 
 
 if __name__ == '__main__':
@@ -251,6 +258,35 @@ if __name__ == '__main__':
     for gerber_primitive in gerber_obj.primitives:
         shapely_objects.append(GerberToShapely(gerber_primitive))
 
-    for shape in shapely_objects:
-        visualize(shape)
+    # visualize_group(shapely_objects)
+    # visualize(shapely_objects[40], terminate=False)
+    # visualize(shapely_objects[41], terminate=False)
+    # visualize(shapely_objects[42], terminate=True)
 
+    line1 = shapely_objects[41]
+    # print('line1', line1)
+    line2 = shapely_objects[42]
+    # print('line2', line2)
+    new_shape = line1.union(line2)
+    # print('new_shape', new_shape)
+    new_shape_buffered = new_shape.buffer(1)
+    print('new_shape_buffered', new_shape_buffered)
+    print()
+    new_shape_buffered_exterior = new_shape_buffered.exterior
+    print('new_shape_buffered_exterior', new_shape_buffered_exterior)
+    print()
+
+    circle = LinearRing(shapely_objects[40])
+    print('circle', circle)
+    print()
+    new_shape2 = Polygon(new_shape_buffered_exterior).union(Polygon(circle))  # SO IT ONLY SUCCESSFULLY UNIONS POLYGON ONLY!!
+    print('new_shape2', new_shape2)
+    print()
+    visualize(new_shape2.exterior)
+    #TODO: make all the GerberToShapely.to methods return Polygons !!!!!
+    #TODO: next step is to implement a seperate() to define which traces to connect !!
+
+
+    # visualize(new_shape_buffered.exterior, terminate=True)
+
+    
