@@ -53,76 +53,77 @@ class GerberToShapely:
                           gerber.primitives.TestRecord: cls.to_test_record}
 
     @classmethod
-    def to_amgroup(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_amgroup(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("AMGroup primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_arc(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_arc(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("Arc primitive gerber object convertion to Shapely method still not implemented")
     
     @classmethod
-    def to_chamfer_rectangle(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_chamfer_rectangle(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("ChamferRectangle primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_circle(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_circle(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
-        return Point(object_to_convert.position[0], object_to_convert.position[1]).buffer(object_to_convert.diameter/2).boundary
+        return Point(object_to_convert.position[0], object_to_convert.position[1]).buffer(object_to_convert.diameter/2)
 
     @classmethod
-    def to_diamond(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_diamond(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("Diamond primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_donut(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_donut(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("Donut primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_drill(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_drill(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("Drill primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_ellipse(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_ellipse(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
 
         '''
         raise NotImplementedError("Ellipse primitive gerber object convertion to Shapely method still not implemented")
 
     @classmethod
-    def to_line(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
+    def to_line(cls, object_to_convert: gerber.primitives.Primitive) -> LineString:
         '''
 
         '''
-        # return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter/2).exterior
-        return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])])
+        return Polygon(LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter/2).exterior)
+        # return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])])
 
     @classmethod
     def to_obround(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
 
         '''
-        ellipse = Ellipse((object_to_convert.position[0], object_to_convert.position[1]), object_to_convert.height, object_to_convert.width)
-        return LinearRing(ellipse.get_verts())
+        ellipse = Ellipse((object_to_convert.position[0], object_to_convert.position[1]), object_to_convert.height*0.8, object_to_convert.width*0.8)
+
+        return Polygon(LinearRing(ellipse.get_verts()))
 
     @classmethod
     def to_outline(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
@@ -144,7 +145,7 @@ class GerberToShapely:
 
         '''
         rectangle = box(object_to_convert.lower_left[0], object_to_convert.lower_left[1], object_to_convert.upper_right[0], object_to_convert.upper_right[1])
-        return LinearRing(list(rectangle.exterior.coords))
+        return Polygon(LinearRing(list(rectangle.exterior.coords)))
 
 
     @classmethod
@@ -201,7 +202,7 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     '''
     visualizes the linked list
     '''
-    if type(line_string) != LineString and type(line_string) != LinearRing:
+    if type(line_string) != LineString and type(line_string) != LinearRing and type(line_string) != Polygon:
         raise ValueError("Must be of type shapely LineString")
 
     turtle_window_size_x = 850
@@ -221,7 +222,11 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     #     color = random.choice(colors)
 
     turtle.pencolor(color)
-    coord_list = list(line_string.coords)
+    if type(line_string) == Polygon:
+        coord_list = list(line_string.exterior.coords)
+
+    else:
+        coord_list = list(line_string.coords)
 
     turtle.up()
     turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord_list[0][1] - y_offset) * multiplier)
@@ -241,12 +246,11 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     if terminate:
         turtle.done()
 
-
 def visualize_group(group):
     for num, sth in enumerate(group[:-1]):
         visualize(sth)
         print(num)
-    visualize(group[-1])
+    visualize(group[-1], terminate=True)
 
 
 if __name__ == '__main__':
@@ -255,36 +259,18 @@ if __name__ == '__main__':
     gerber_obj = gerber.read(gerber_file)
 
     shapely_objects = []
-    for gerber_primitive in gerber_obj.primitives:
+    for num, gerber_primitive in enumerate(gerber_obj.primitives):
         shapely_objects.append(GerberToShapely(gerber_primitive))
 
-    # visualize_group(shapely_objects)
-    # visualize(shapely_objects[40], terminate=False)
-    # visualize(shapely_objects[41], terminate=False)
-    # visualize(shapely_objects[42], terminate=True)
 
-    line1 = shapely_objects[41]
-    # print('line1', line1)
-    line2 = shapely_objects[42]
-    # print('line2', line2)
-    new_shape = line1.union(line2)
-    # print('new_shape', new_shape)
-    new_shape_buffered = new_shape.buffer(1)
-    print('new_shape_buffered', new_shape_buffered)
-    print()
-    new_shape_buffered_exterior = new_shape_buffered.exterior
-    print('new_shape_buffered_exterior', new_shape_buffered_exterior)
-    print()
+    # IT WORKS :D !!!
+    whole_thing = shapely_objects[0]
+    for num, shapely_object in enumerate(shapely_objects[1:]):
+        whole_thing = whole_thing.union(shapely_object)
 
-    circle = LinearRing(shapely_objects[40])
-    print('circle', circle)
-    print()
-    new_shape2 = Polygon(new_shape_buffered_exterior).union(Polygon(circle))  # SO IT ONLY SUCCESSFULLY UNIONS POLYGON ONLY!!
-    print('new_shape2', new_shape2)
-    print()
-    visualize(new_shape2.exterior)
-    #TODO: make all the GerberToShapely.to methods return Polygons !!!!!
-    #TODO: next step is to implement a seperate() to define which traces to connect !!
+    whole_thing = list(whole_thing.geoms)
+    visualize_group(whole_thing)
+
 
 
     # visualize(new_shape_buffered.exterior, terminate=True)
