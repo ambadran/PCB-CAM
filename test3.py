@@ -66,32 +66,47 @@ class RoundedPolygon(patches.PathPatch):
             x0, x1, x2 = np.atleast_1d(xy[i - 1], xy[i], xy[(i + 1) % n])
 
             d01, d12 = x1 - x0, x2 - x1
-            d01, d12 = d01 / np.linalg.norm(d01), d12 / np.linalg.norm(d12)
+            l01, l12 = np.linalg.norm(d01), np.linalg.norm(d12)
+            u01, u12 = d01 / l01, d12 / l12
 
-            x00 = x0 + pad * d01
-            x01 = x1 - pad * d01
-            x10 = x1 + pad * d12
-            x11 = x2 - pad * d12
+            x00 = x0 + min(pad, 0.5 * l01) * u01
+            x01 = x1 - min(pad, 0.5 * l01) * u01
+            x10 = x1 + min(pad, 0.5 * l12) * u12
+            x11 = x2 - min(pad, 0.5 * l12) * u12
 
             if i == 0:
                 verts = [x00, x01, x1, x10]
             else:
                 verts += [x01, x1, x10]
+
         codes = [path.Path.MOVETO] + n*[path.Path.LINETO, path.Path.CURVE3, path.Path.CURVE3]
+
+        verts[0] = verts[-1]
 
         return np.atleast_1d(verts, codes)
 
 
 polygon = Polygon(LinearRing([(0, 0), (10, 0), (10, 10), (0, 10)]))
 coords = list(polygon.exterior.coords)
+print(coords)
 
-xy = np.array(coords[:-1])
-rounded_polygon = RoundedPolygon(xy=xy, pad=0.1)
+def round_(coords):
 
-weird_coords = list(rounded_polygon.get_path().vertices)
-coords_list = []
-for val in weird_coords:
-        coords_list.append((val[0], val[1]))
+    xy = np.array(coords[:-1])
+    rounded_polygon = RoundedPolygon(xy=xy, pad=3)
 
-line_string = LineString(coords_list)
+    weird_coords = list(rounded_polygon.get_path().vertices)
+    coords_list = []
+    for val in weird_coords:
+            coords_list.append((val[0], val[1]))
+
+    line_string = LineString(coords_list)
+    return line_string
+
+line_string = round_(coords)
+print(line_string)
+line_string = round_(line_string.coords)
+print(line_string)
+
+
 visualize(line_string, terminate=True)

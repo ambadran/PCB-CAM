@@ -55,9 +55,19 @@ class GerberToShapely:
     @classmethod
     def to_amgroup(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
         '''
-
+        AMGroup stands for Apt Macro Group, it's made of a list of Outline objects and other shapes like Circle or Obround
         '''
-        raise NotImplementedError("AMGroup primitive gerber object convertion to Shapely method still not implemented")
+        polygon_list = []
+        for shape in object_to_convert.primitives:
+            print(shape)
+            print(GerberToShapely(shape))
+            polygon_list.append(GerberToShapely(shape))
+
+        whole_thing = polygon_list[0]
+        for polygon in polygon_list[1:]:
+            whole_thing.union(polygon)
+
+        return whole_thing
 
     @classmethod
     def to_arc(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
@@ -106,31 +116,106 @@ class GerberToShapely:
         '''
 
         '''
-        raise NotImplementedError("Ellipse primitive gerber object convertion to Shapely method still not implemented")
+        ellipse = Ellipse((object_to_convert.position[0], object_to_convert.position[1]), object_to_convert.height*0.8, object_to_convert.width*0.8)
+
+        return Polygon(LinearRing(ellipse.get_verts()))
 
     @classmethod
     def to_line(cls, object_to_convert: gerber.primitives.Primitive) -> LineString:
         '''
 
         '''
-        return Polygon(LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter/2).exterior)
-        # return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])])
+        if object_to_convert.aperture.diameter != 0:
+            return Polygon(LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])]).buffer(object_to_convert.aperture.diameter/2).exterior)
+
+        else:
+            return LineString([(object_to_convert.start[0], object_to_convert.start[1]), (object_to_convert.end[0], object_to_convert.end[1])])
 
     @classmethod
     def to_obround(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
 
         '''
-        ellipse = Ellipse((object_to_convert.position[0], object_to_convert.position[1]), object_to_convert.height*0.8, object_to_convert.width*0.8)
+        # Step 1: create the base circle
+        diameter = object_to_convert.height if object_to_convert.height < object_to_convert.width else object_to_convert.width
+        radius = diameter/2
+        circle = Point(object_to_convert.position).buffer(radius)
 
-        return Polygon(LinearRing(ellipse.get_verts()))
+        # Step 2: divide the circle into 4 quarters
+        x_min = object_to_convert.position[0] - radius
+        x_max = object_to_convert.position[0] + radius
+        y_min = object_to_convert.position[1] - radius
+        y_max = object_to_convert.position[1] + radius
+
+        circle_coords = list(circle.exterior.coords) 
+
+        top_coord = (object_to_convert.position[0], y_max)
+        right_coord = (x_max, object_to_convert.position[1])
+        bottom_coord = (object_to_convert.position[0], y_min)
+        left_coord = (x_min, object_to_convert.position[1])
+
+        top_coord_ind = circle_coords.index(top_coord)
+        top_coord_ind2 = top_coord_ind if circle_coords.count(top_coord) == 1 else -1
+        right_coord_ind = circle_coords.index(right_coord)
+        right_coord_ind2 = right_coord_ind if circle_coords.count(right_coord) == 1 else -1
+        bottom_coord_ind = circle_coords.index(bottom_coord)
+        bottom_coord_ind2 = bottom_coord_ind if circle_coords.count(bottom_coord) == 1 else -1
+        left_coord_ind = circle_coords.index(left_coord)
+        left_coord_ind2 = left_coord_ind if circle_coords.count(left_coord) == 1 else -1
+
+        top_right_coords = circle_coords[top_coord_ind : right_coord_ind2]
+        bottom_right_coords = circle_coords[right_coord_ind : bottom_coord_ind2]
+        bottom_left_coords = circle_coords[bottom_coord_ind: left_coord_ind2]
+        top_left_coords = circle_coords[left_coord_ind : top_coord_ind2]
+
+        # Step 3: Find the 2 shifting transformations (if they exist)
+        if object_to_convert.height > object_to_convert.width:
+            # 2 vertical transformations for each two quarters
+            shifting_value = (object_to_convert.height - object_to_convert.width)/2
+            top_right_coords = [(coord[0], coord[1]+shifting_value) for coord in top_right_coords]
+            top_left_coords = [(coord[0], coord[1]+shifting_value) for coord in top_left_coords]
+            bottom_right_coords = [(coord[0], coord[1]-shifting_value) for coord in bottom_right_coords]
+            bottom_left_coords = [(coord[0], coord[1]-shifting_value) for coord in bottom_left_coords]
+
+        elif object_to_convert.height < object_to_convert.width:
+            # 2 horizontal transformations for each two quarters
+            shifting_value = (object_to_convert.width - object_to_convert.height)/2
+            top_right_coords = [(coord[0]+shifting_value, coord[1]) for coord in top_right_coords]
+            bottom_right_coords = [(coord[0]+shifting_value, coord[1]) for coord in bottom_right_coords]
+            top_left_coords = [(coord[0]-shifting_value, coord[1]) for coord in top_left_coords]
+            bottom_left_coords = [(coord[0]-shifting_value, coord[1]) for coord in bottom_left_coords]
+
+        else:
+            # No transformations
+            pass
+
+        joined_quarters_coords = top_right_coords
+        joined_quarters_coords.extend(bottom_right_coords)
+        joined_quarters_coords.extend(bottom_left_coords)
+        joined_quarters_coords.extend(top_left_coords)
+
+        return Polygon(LinearRing(joined_quarters_coords))
+
 
     @classmethod
     def to_outline(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
-
+        like AMGroup, it has the .primitives attribute and contain a bunch of Line objects
         '''
-        raise NotImplementedError("Outline primitive gerber object convertion to Shapely method still not implemented")
+        # checking my theory that outline only contains Line
+        for shape in object_to_convert.primitives:
+            if type(shape) != gerber.primitives.Line:
+                raise ValueError("I thought Outline only contains Line object ;(")
+
+            if shape.aperture.diameter != 0:
+                raise ValueError("I thought outline gerber.primitives.Line objects don't have a thickness ;(")
+
+        coord_list = []
+        for line in object_to_convert.primitives:
+            coord_list.append(line.start)
+            coord_list.append(line.end)
+
+        return Polygon(LinearRing(coord_list))
 
     @classmethod
     def to_polygon(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
@@ -254,7 +339,7 @@ def visualize_group(group):
 
 
 if __name__ == '__main__':
-    gerber_file = 'gerber_files/default.gbr'
+    gerber_file = 'gerber_files/limit_switch-F_Cu.gbr'
     
     gerber_obj = gerber.read(gerber_file)
 
@@ -271,8 +356,10 @@ if __name__ == '__main__':
     whole_thing = list(whole_thing.geoms)
     visualize_group(whole_thing)
 
+    #TODO: figure out how to MIRROR the gerber file
+    #TODO: figure out how to move the gerber file
 
 
-    # visualize(new_shape_buffered.exterior, terminate=True)
+
 
     
