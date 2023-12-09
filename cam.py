@@ -337,29 +337,62 @@ def visualize_group(group):
         print(num)
     visualize(group[-1], terminate=True)
 
+def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, debug: bool=False):
+    '''
+    Get list of list of coordinates, each list is one continious piece of trace.
 
-if __name__ == '__main__':
-    gerber_file = 'gerber_files/limit_switch-F_Cu.gbr'
-    
-    gerber_obj = gerber.read(gerber_file)
+    Meant for laser gcode where the laser go to first coordinate in a list, turn laser on, go to all coordinates, then laser OFF, then
+    go to first coordinate in the next list, turn laser on , go to all coordiantes, then laser OFF, etc..
 
+    :param gerber: Gerber Object from the gerber library
+    :param include_edge_cuts: includes the edge cuts as part of pcb laser marking process
+    :param debug: enable debugging info and display laser motion
+    :return: list of list of coordinates of one continious trace
+
+    #TODO: implement include_edge_cuts functionality
+    #TODO: think about whether to round here or in the gcode_tools functions
+    '''
     shapely_objects = []
     for num, gerber_primitive in enumerate(gerber_obj.primitives):
         shapely_objects.append(GerberToShapely(gerber_primitive))
 
-
-    # IT WORKS :D !!!
     whole_thing = shapely_objects[0]
     for num, shapely_object in enumerate(shapely_objects[1:]):
         whole_thing = whole_thing.union(shapely_object)
 
     whole_thing = list(whole_thing.geoms)
-    visualize_group(whole_thing)
+    coord_list_list = [list(polygon_.exterior.coords) for polygon_ in whole_thing]
 
+    if debug:
+        visualize_group(whole_thing)
+
+    return coord_list_list
+
+def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile):
+    '''
+    Gets list of coordinates where the spindle must go straight down in the Z axis to drill
+
+    :param gerber: Gerber Object from the gerber library
+    :return: list of holes coordinates
+    '''
+    coord_list = []
+    for primitive in gerber_obj.primitives:
+        if type(primitive) != gerber.primitives.Line:
+            coord_list.append(primitive.position)
+
+    return coord_list
+
+
+if __name__ == '__main__':
+    gerber_file = 'gerber_files/limit_switch-F_Cu.gbr'
+    
+    gerber_obj = gerber.read(gerber_file)
     #TODO: figure out how to MIRROR the gerber file
     #TODO: figure out how to move the gerber file
 
+    # print(get_laser_coords(gerber_obj, debug=True))
 
+    print(get_holes_coords(gerber_obj))
 
 
     

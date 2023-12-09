@@ -1,10 +1,11 @@
 '''
 This file has function to generate the gcode we want
 '''
-from gerber_tools import *
 from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
+from cam import get_laser_coords, get_holes_coords, get_pen_coords
+import gerber
 
 
 def get_max_decimal_place(value: float) -> int:
@@ -362,13 +363,13 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
     return tool
 
 
-def generate_holes_gcode(gerber: Gerber, tool: Callable, motor_up_z_position: int, 
+def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, motor_up_z_position: int, 
         motor_down_z_position: int, feedrate_XY: int, feedrate_Z_drilling: int, feedrate_Z_up_from_pcb: int, 
         spindle_speed: int) -> str:
     '''
     Takes in String gerber file content, identifies the PCB holes and generates the Gcode to drill the holes from begging to end!
 
-    :param gerber: Gerber object
+    :param gerber: Gerber object from the gerber library
     :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
     :param motor_up_z_position: position the drill bit is not touching the PCB is off a reasonable offset above the PCB
     :param motor_down_z_position: position the drill bit has completely drilled through the PCB 
@@ -404,7 +405,7 @@ def generate_holes_gcode(gerber: Gerber, tool: Callable, motor_up_z_position: in
     # Cutting starts here :)
 
     #TODO: fix this line to return the coordinates using the python gerber library. I am still not sure how to extract componentPad coords
-    # coordinates = gerber.coordinates[BlockType.ComponentPad]
+    coordinates = get_holes_coords(gerber_obj)
 
     for coordinate in coordinates:
         gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate, feedrate=feedrate_XY)
@@ -421,10 +422,10 @@ def generate_holes_gcode(gerber: Gerber, tool: Callable, motor_up_z_position: in
     return gcode
 
 
-def generate_ink_laying_gcode(gerber: Gerber, tool: Callable, tip_thickness: float, pen_down_position: int, 
+def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, tip_thickness: float, pen_down_position: int, 
         feedrate: int) -> str:
     '''
-    :param gerber: Gerber Object
+    :param gerber: Gerber Object from the gerber library
     :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
     :param tip_thickness: number to convey thickness of pen tip in mm
     :param pen_down_position: position that pen touches PCB in Z axis
@@ -530,70 +531,8 @@ def generate_ink_laying_gcode(gerber: Gerber, tool: Callable, tip_thickness: flo
 
     return gcode
 
-#TODO: rewrite this function using the new shapely library ;/
-# def get_laser_coordinates_lists(gerber: Gerber, include_edge_cuts: bool, debug: bool =False) -> list[list[Coordinate]]:
-#     '''
-#     Get list of list of coordinates, each list is one continious piece of trace.
 
-#     Meant for laser gcode where the laser go to first coordinate in a list, turn laser on, go to all coordinates, then laser OFF, then
-#     go to first coordinate in the next list, turn laser on , go to all coordiantes, then laser OFF, etc..
-
-#     :param gerber: Gerber Object
-#     :param include_edge_cuts: includes the edge cuts as part of pcb laser marking process
-#     :param debug: enable debugging info
-#     :return: list of list of coordinates of one continious trace
-#     '''
-#     if debug:
-#         Graph.DEBUG_SEPERATE = False
-#         Graph.DEBUG_ORDERED_EDGES = False
-#         Graph.DEBUG_APPLY_OFFSET = False
-#         Graph.DEBUG_FILTER_TINY_EDGES = False
-#         Graph.DEBUG_TO_SINGLY_LINKEDLIST = False
-#         Node.DEBUG_ADD_COMPPAD = False  #TODO: currently it always shows debugging info
-#         Node.DEBUG_RECTANGLE_COMPPAD = False
-
-#     # converting trace gerber blocks to one big graph
-#     graph_unsep_unoff: Graph = gerber.blocks_to_graph(gerber.blocks[BlockType.Conductor])
-
-#     # Filtering the stupid tiny edges
-#     graph_unsep_unoff.filter_tiny_edges()  # doesn't filter all of them ;)
-
-#     # seperating continious traces each into it's own graph
-#     graphs_sep_unoff: list[Graph] = graph_unsep_unoff.seperate()
-
-#     # apply thickness offset to the graphs
-#     graphs_sep_off: list[Graph] = [graph.apply_offsets() for graph in graphs_sep_unoff]
-
-#     # Converting the graphs to singly linkedlists
-#     linkedlists_sep_off: list[Node] = [graph.to_singly_linkedlist() for graph in graphs_sep_off]
-
-#     # Rounding trace coordinates  #TODO: This step should not be necessary
-#     linkedlists_sep_off_comppad: list[Node] = [linkedlist.round_all(5) for linkedlist in linkedlists_sep_off]
-
-#     # Incorporating component pads to the linked lists
-#     comppad_blocks: list[Block] = gerber.blocks[BlockType.ComponentPad]
-#     linkedlists_sep_off_comppad: list[Node] = [linkedlist.add_comppad(comppad_blocks) for linkedlist in linkedlists_sep_off]
-
-#     # Adding non-intersecting comppads
-#     linkedlists_sep_off_comppad.extend(Node.get_non_intersecting_comppads(comppad_blocks))
-
-#     # Adding edge cuts if wanted
-#     if include_edge_cuts:
-#         linkedlists_sep_off_comppad.append(Node.get_edge_cut_node(gerber.coordinates[BlockType.Profile]))
-
-#     # visuzlizing for debugging
-#     if debug:
-#         for linkedlist in linkedlists_sep_off_comppad[:-1]:
-#             linkedlist.visualize(multiplier=15, x_offset=27, speed=5, terminate=False)
-#         linkedlists_sep_off_comppad[-1].visualize(multiplier=15, x_offset=27, speed=5, terminate=True)
-
-#     # Converting list of nodes to list of list of coordiantes
-#     coordlist_sep_off_comppad = [node.to_list() for node in linkedlists_sep_off_comppad]
-
-#     return coordlist_sep_off_comppad
-
-
-def generate_pcb_trace_gcode(gerber_file: str, tool: Callable, optimum_focal_distance: int, 
+def generate_pcb_trace_gcode(gerber_file: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
         feedrate: int, laser_power: int, include_edge_cuts: bool, laser_passes: int, debug: bool=False) -> str:
     '''
     :param gerber_file: the file that we want to get the holes coordinate from
@@ -602,7 +541,6 @@ def generate_pcb_trace_gcode(gerber_file: str, tool: Callable, optimum_focal_dis
     :param feedrate: integer mm/minute, only for x and y movement, z movement is hardcoded here
     :param laser_power: laser intensity for toner transfer, please note that the value is 0-250, default value is 150 as tested.
     :param passes: number of passes done by laser
-    :param debug: passed to get_laser_coordinates_lists
 
     :return: This function creates the gcode content as string according to the input coordinates
     '''
@@ -626,7 +564,7 @@ def generate_pcb_trace_gcode(gerber_file: str, tool: Callable, optimum_focal_dis
     ### PCB trace laser marking Gcode
     # Getting Offset Coordinates for laser module to burn in 
     # The bulk of the code is in this single line ;)
-    coordinate_lists = get_laser_coordinates_lists(gerber_file, include_edge_cuts, debug=debug)  
+    coordinate_lists = get_laser_coords(gerber_file, include_edge_cuts, debug=debug)  
 
     gcode += f"; Number of passes: {laser_passes}\n\n"
     for pass_num in range(laser_passes):
@@ -718,26 +656,29 @@ if __name__ == '__main__':
 
     ### Main Code ###
     # Read the gerber file
-    gerber = Gerber(file_path=gerber_file_path)
+    gerber_obj = gerber.read(gerber_file)
 
     # Mirror Gerber File
-    gerber = gerber.mirror()
+    #TODO: implement this
+    # gerber_obj = gerber_obj.mirror()
 
     # Recenter Gerber File with wanted Offset
-    gerber = Gerber.recenter_gerber_file(gerber, x_offset, y_offset)
+    #TODO: implement this
+    # gerber_obj = Gerber.recenter_gerber_file(gerber_obj, x_offset, y_offset)
 
-    # gerber.create_gerber_file('gerber_files/default.gbr')
+    #TODO: implement this
+    # # gerber_obj.create_gerber_file('gerber_files/default.gbr')
 
     gcode = ''
 
 #     # Creating the holes_gcode
-#     gcode += generate_holes_gcode(gerber, tool, router_Z_up_position, router_Z_down_position, router_feedrate_XY, router_feedrate_Z, spindle_speed, terminate_after = False)
+#     gcode += generate_holes_gcode(gerber_obj, tool, router_Z_up_position, router_Z_down_position, router_feedrate_XY, router_feedrate_Z, spindle_speed, terminate_after = False)
 
 #     # Creating the PCB ink laying Gcode
-#     gcode += generate_ink_laying_gcode(gerber, tool, tip_thickness, pen_down_position, ink_laying_feedrate, initiated_before=True, terminate_after = False)
+#     gcode += generate_ink_laying_gcode(gerber_obj, tool, tip_thickness, pen_down_position, ink_laying_feedrate, initiated_before=True, terminate_after = False)
 
     # Creating the PCB trace laser Toner Transfer Gcode
-    gcode += generate_pcb_trace_gcode(gerber, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
+    gcode += generate_pcb_trace_gcode(gerber_obj, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
 
     # exporting the created Gcode
     export_gcode(gcode, gcode_file_path)
