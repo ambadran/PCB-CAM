@@ -4,11 +4,43 @@ Then uses shapely to create outline gcode and holes gcode.
 '''
 from __future__ import annotations
 import gerber
-from shapely import Point, MultiPoint, LineString, LinearRing, box, Polygon
+try:
+    from shapely import Point, MultiPoint, LineString, LinearRing, box, Polygon
+except ImportError:
+    from shapely.geometry import Point, MultiPoint, LineString, LinearRing, box, Polygon
+
 from matplotlib.patches import Ellipse
 from copy import deepcopy
 import turtle
 import random
+
+### Adding features to imported classes ###
+
+# 1: adding slicing feature to Point class from shapely
+def point_getitem(self, index) -> float:
+    '''
+    Enable slicing of coordinate objects
+    '''
+    if index == 0:
+        return self.x
+    elif index == 1:
+        return self.y
+    elif index == 2:
+        return self.z
+    else:
+        raise IndexError("Only X, Y, Z values available")
+
+Point.__getitem__ = point_getitem
+
+# 2: adding mirror feature to gerber class
+
+
+# 3: adding x-offset and y-offset to gerber class
+
+
+#############################################
+
+
 
 class GerberToShapely:
     '''
@@ -334,7 +366,7 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
 def visualize_group(group):
     for num, sth in enumerate(group[:-1]):
         visualize(sth)
-        print(num)
+        print(f"Visualizaing Trace number: {num}")
     visualize(group[-1], terminate=True)
 
 def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, debug: bool=False):
@@ -362,6 +394,7 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
 
     whole_thing = list(whole_thing.geoms)
     coord_list_list = [list(polygon_.exterior.coords) for polygon_ in whole_thing]
+    coord_list_list = [[Point(coord) for coord in coord_list] for coord_list in coord_list_list]
 
     if debug:
         visualize_group(whole_thing)
@@ -378,10 +411,15 @@ def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile):
     coord_list = []
     for primitive in gerber_obj.primitives:
         if type(primitive) != gerber.primitives.Line:
-            coord_list.append(primitive.position)
+            coord_list.append(Point(primitive.position))
 
     return coord_list
 
+def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile):
+    '''
+
+    '''
+    pass
 
 if __name__ == '__main__':
     gerber_file = 'gerber_files/limit_switch-F_Cu.gbr'

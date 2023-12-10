@@ -4,9 +4,7 @@ This file has function to generate the gcode we want
 from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
-from cam import get_laser_coords, get_holes_coords, get_pen_coords
-import gerber
-
+from cam import get_laser_coords, get_holes_coords, get_pen_coords, Point, gerber
 
 def get_max_decimal_place(value: float) -> int:
     '''
@@ -72,12 +70,15 @@ def get_coordinate_from_kwargs(kwargs) -> str:
                 raise ValueError("Can't have both coordinate argument and x, y or z arguments")
             coordinate_mode = True
 
-            if type(value) != Coordinate:
-                raise ValueError("Coordinate value must be of type Coordinate")
+            if type(value) != Point:
+                raise ValueError(f"type {type(value)} is passed! Value must be of type Point")
 
-            if len(value) == 2:
-                if not(type(value[0]) == int or type(value[1]) == int or type(value[0]) == float or type(value[1]) == float):
-                    raise ValueError("Coordinate list must only contain integers or floats")
+            if not value.has_z:
+                try: # checking internal values are numbers
+                    tmp = float(value[0])
+                    tmp = float(value[1])
+                except Exception:
+                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0]), type(value[1])}")
 
                 x_val = value[0]
                 if type(x_val) == float:
@@ -89,9 +90,12 @@ def get_coordinate_from_kwargs(kwargs) -> str:
 
                 gcode += f'X{x_val}Y{y_val}'
 
-            elif len(value) == 3:
-                if not(type(value[0]) == int or type(value[1]) == int or type(value[0]) == float or type(value[1]) == float or type(value[2]) == int or type(value[2] == float)):
-                    raise ValueError("Coordinate list must only contain integers or floats")
+            else:
+                try: # checking internal values are numbers
+                    tmp = float(value[0])
+                    tmp = float(value[1])
+                except Exception:
+                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0]), type(value[1])}")
 
                 x_val = value[0]
                 if type(x_val) == float:
@@ -107,8 +111,6 @@ def get_coordinate_from_kwargs(kwargs) -> str:
 
                 gcode += f'X{x_val}Y{y_val}Z{z_val}'
 
-            else:
-                raise ValueError("Coordinate list must contain 2 or 3 integer/float values: [x, y] or [x, y, z]")
 
 
         elif key == 'x' or key == 'X':
@@ -213,7 +215,7 @@ def general_machine_init() -> str:
     # Make sure grbl understands it's at zero now
     gcode += set_grbl_coordinate(CoordMode.ABSOLUTE,
             comment="Force Reset current coordinates after homing\n", 
-            coordinate=Coordinate(0, 0, 0))
+            coordinate=Point(0, 0, 0))
     
     return gcode
 
@@ -226,7 +228,7 @@ def general_machine_deinit() -> str:
     '''
     gcode = ''
     gcode += '; Machine deinitialization Sequence... \n\n'
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Coordinate(0, 0, 0))
+    gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(0, 0, 0))
     gcode += 'B0 ; Turn Machine OFF\n'
 
     return gcode
@@ -325,7 +327,7 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
             # now pull off the female kinematch mount off its hanger, using incremental gcode
             gcode += move(CoordMode.ABSOLUTE,  use_00=True, comment='Exit Female Kinematic Mount Home Pos', x=latch_offset_distance_out)
 
-            ### Fixing Current Coordinate according the new tool head
+            ### Fixing Current Point according the new tool head
             gcode += set_grbl_coordinate(CoordMode.INCREMENTAL, comment=' ;Add tool offset coordinate', coordinate=tool_offset)
 
             ### Activate it by sending the corresponding tool number in the multiplexer
@@ -339,7 +341,7 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
             gcode += 'C0 ; PWM Tool select demultiplexer to select tool zero which is the empty tool slot in multiplexers\n'
 
             ### Overide current coordinate to go to tool home pos relative to origin by inversing the tool_offset
-            tool_offset = Coordinate(tool_offset.x*-1, tool_offset.y*-1, tool_offset.z*-1)
+            tool_offset = Point(tool_offset.x*-1, tool_offset.y*-1, tool_offset.z*-1)
             gcode += set_grbl_coordinate(CoordMode.INCREMENTAL, comment=' ;Remove tool offset coordinate', coordinate=tool_offset)
 
             ### Deactivate it by selecting the empty tool in the multiplexer
@@ -441,7 +443,7 @@ def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, 
     #NEW CODE: edge_coordinates = gerber.bounds #TODO: make the output of this python gerber the same as my old output
 
 
-    min_coord, max_coord = Coordinate.get_min_max(edge_coordinates)
+    min_coord, max_coord = Point.get_min_max(edge_coordinates)
 
     # Finding num_ys and overlapping_distance
     #NOTE: Detailed description of what i am doing here is in the iPad notes
@@ -532,7 +534,7 @@ def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, 
     return gcode
 
 
-def generate_pcb_trace_gcode(gerber_file: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
+def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
         feedrate: int, laser_power: int, include_edge_cuts: bool, laser_passes: int, debug: bool=False) -> str:
     '''
     :param gerber_file: the file that we want to get the holes coordinate from
@@ -562,13 +564,13 @@ def generate_pcb_trace_gcode(gerber_file: gerber.rs274x.GerberFile, tool: Callab
     gcode += f"S{laser_power} ; Setting Laser Power\n\n"
 
     ### PCB trace laser marking Gcode
-    # Getting Offset Coordinates for laser module to burn in 
+    # Getting Offset Points for laser module to burn in 
     # The bulk of the code is in this single line ;)
-    coordinate_lists = get_laser_coords(gerber_file, include_edge_cuts, debug=debug)  
+    coordinate_lists = get_laser_coords(gerber_obj, include_edge_cuts, debug=debug)  
 
     gcode += f"; Number of passes: {laser_passes}\n\n"
     for pass_num in range(laser_passes):
-        gcode += f'; Pass number: {pass_num}\n'
+        gcode += f'; Pass number: {pass_num+1}\n'
 
         for coordinate_list in coordinate_lists:
             gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
@@ -621,9 +623,9 @@ if __name__ == '__main__':
     X_latch_offset_distance_in = 188  # ABSOLUTE value
     X_latch_offset_distance_out = 92  # ABSOLUTE value
     attach_detach_time = 5 # the P attribute in Gcode is in seconds
-    tool_home_coordinates = {1: Coordinate(165, 0, 11), 2: Coordinate(165, 91, 12), 3: Coordinate(165, 185.5, 12)}  # ABSOLUTE values
+    tool_home_coordinates = {1: Point(165, 0, 11), 2: Point(165, 91, 12), 3: Point(165, 185.5, 12)}  # ABSOLUTE values
 
-    tool_offsets = {0: Coordinate(0, 0, 0), 1: Coordinate(0, 0, 0), 2: Coordinate(0, 0, 0), 3: Coordinate(0, 0, 0)}  #TODO: find this value ASAP, 
+    tool_offsets = {0: Point(0, 0, 0), 1: Point(0, 0, 0), 2: Point(0, 0, 0), 3: Point(0, 0, 0)}  #TODO: find this value ASAP, 
 
     tool = get_tool_func(X_latch_offset_distance_in, X_latch_offset_distance_out, tool_home_coordinates, tool_offsets, attach_detach_time)
 

@@ -43,7 +43,7 @@ def main(settings: Settings):
 
     ### Processing the Gerber file
     # Read the gerber file
-    gerber_obj = gerber.read(gerber_file)
+    gerber_obj = gerber.read(settings.src)
 
     # Recenter Gerber File with wanted Offset
     #TODO: implement this
@@ -63,18 +63,18 @@ def main(settings: Settings):
 
     # Creating the PCB ink laying Gcode
     if settings.all_gcode or settings.ink:
-        gcode += generate_ink_laying_gcode(gerber, settings.tool, settings.tip_thickness, 
+        gcode += generate_ink_laying_gcode(gerber_obj, settings.tool, settings.tip_thickness, 
                                            settings.pen_down_position, settings.ink_laying_feedrate)
 
     # Creating the PCB trace laser Toner Transfer Gcode
     if settings.all_gcode or settings.laser:
-        gcode += generate_pcb_trace_gcode(gerber, settings.tool, settings.optimum_laser_Z_position, 
+        gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
                 settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
                 debug=settings.debug_laser)
 
     # Creating the holes_gcode
     if settings.all_gcode or settings.holes:
-        gcode += generate_holes_gcode(gerber, settings.tool, settings.router_Z_up_position, 
+        gcode += generate_holes_gcode(gerber_obj, settings.tool, settings.router_Z_up_position, 
                                       settings.router_Z_down_position, settings.router_feedrate_XY, 
                                       settings.router_feedrate_Z_drilling, settings.router_feedrate_Z_up_from_pcb,
                                       settings.spindle_speed)
@@ -100,14 +100,14 @@ if __name__ == '__main__':
         "X_latch_offset_distance_in": 188,  # ABSOLUTE value
         "X_latch_offset_distance_out": 92,  # ABSOLUTE value
         "attach_detach_time": 5, # the P attribute in Gcode is in seconds
-        "tool_home_coordinates": {1: Coordinate(165, 0, 11), 
-                                2: Coordinate(165, 91, 12), 
-                                3: Coordinate(165, 185.5, 12)},  # ABSOLUTE values
+        "tool_home_coordinates": {1: Point(165, 0, 11), 
+                                2: Point(165, 91, 12), 
+                                3: Point(165, 185.5, 12)},  # ABSOLUTE values
 
-        "tool_offsets": {0: Coordinate(0, 0, 0), 
-                       1: Coordinate(0, 0, 0), 
-                       2: Coordinate(0, 0, 0), 
-                       3: Coordinate(0, 0, 0)},  #TODO: find this value ASAP, 
+        "tool_offsets": {0: Point(0, 0, 0), 
+                       1: Point(0, 0, 0), 
+                       2: Point(0, 0, 0), 
+                       3: Point(0, 0, 0)},  #TODO: find this value ASAP, 
 
 
         ### spindle tweaking values
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         'all_gcode': False,
         'ink': False,
         'laser': True,
-        'holes':  False
+        'holes': True 
 
     }
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     settings.src = 'gerber_files/default.gbr'
 
     ### Destination File
-    settings.dest = 'gcode_files/test_main.gcode'
+    settings.dest = 'gcode_files/test.gcode'
 
     ### Executing the Program!
     main(settings)
