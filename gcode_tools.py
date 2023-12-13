@@ -661,12 +661,10 @@ if __name__ == '__main__':
     gerber_obj = gerber.read(gerber_file)
 
     # Mirror Gerber File
-    #TODO: implement this
-    # gerber_obj = gerber_obj.mirror()
+    gerber_obj.mirror()
 
     # Recenter Gerber File with wanted Offset
-    #TODO: implement this
-    # gerber_obj = Gerber.recenter_gerber_file(gerber_obj, x_offset, y_offset)
+    gerber_obj.recenter_gerber_file(x_offset, y_offset)
 
     #TODO: implement this
     # # gerber_obj.create_gerber_file('gerber_files/default.gbr')

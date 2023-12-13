@@ -14,7 +14,7 @@ from copy import deepcopy
 import turtle
 import random
 
-### Adding features to imported classes ###
+############# Adding features to imported classes #############
 
 # 1: adding slicing feature to Point class from shapely
 def point_getitem(self, index) -> float:
@@ -32,13 +32,111 @@ def point_getitem(self, index) -> float:
 
 Point.__getitem__ = point_getitem
 
-# 2: adding mirror feature to gerber class
+# 2: adding x-offset and y-offset to gerber class
+def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
+    '''
+    recenter the whole gerber file, self now contains the gerber file with recentered coordinates of everything
+
+    # self.bounds = ((152.273, 200.773), (-108.331, -82.943))
+    # x_min = 152.273
+    # x_max = 200.773
+    # y_min = -108.331
+    # y_max = -82.943
+
+    :param x_offset: wanted x offset from origin. if 0 then pcb will start at 0
+    :param y_offset: wanted y offset from origin. if 0 then pcb will start at 0
+    '''
+    # Get X and Y, min and max
+    bounds = self.bounds
+    x_min = bounds[0][0]
+    x_max = bounds[0][1]
+    y_min = bounds[1][0]
+    y_max = bounds[1][1]
+
+    # Calculating the offset to be added to each coordinate in the gerber file
+    x_offset = -x_min + x_offset
+    y_offset = -y_min + y_offset
+
+    # Changing the statements attribute, the .bounds method is a property method depending on .statements
+    for stmt in self.statements:
+        stmt.offset(x_offset, y_offset)
+
+    #TODO: I think there might be a way to create a new gerber file from the new statements generated from this loop
+    
+    # Changing the primitive attribute
+    for ind, primitive in enumerate(self.primitives):
+
+        if type(primitive) == gerber.primitives.Line:
+            self.primitives[ind].start = (primitive.start[0] + x_offset, primitive.start[1] + y_offset)
+            self.primitives[ind].end = (primitive.end[0] + x_offset, primitive.end[1] + y_offset)
+
+        else:
+            self.primitives[ind].position = (primitive.position[0] + x_offset, primitive.position[1] + y_offset)
+
+    # print(self.primitives[80].start)
+    # self.primitives[80].start = (self.primitives[80].start[0] + x_offset, self.primitives[80].start[1] + y_offset)
+    # print(self.primitives[80].start)
+
+gerber.rs274x.GerberFile.recenter_gerber_file = recenter_gerber_file
+
+# 3: adding mirror feature to gerber class
+def gerber_mirror(self, x_y_axis: bool = True) -> None:
+    '''
+    Mirrors the gerber file (for DIP components)
+
+    Procedure:
+    Step-1: x OR y coordinate is *-1 depending on whether we want to mirror in x or y axis
+    Step-2: recenter to (x_min, y_min) (which is measured before step 1!!) 
+    Done :D
+
+    :param x_y_axis: determines whether to mirror in x or y axis, default is x-axis mirroring
+    '''
+    # Get X and Y, min for step2
+    bounds = self.bounds
+    x_min = bounds[0][0]
+    y_min = bounds[1][0]
 
 
-# 3: adding x-offset and y-offset to gerber class
+    ### Step 1: *-1
+    # *-1 the .statements, the .bounds method is a property method depending on .statements
+    for stmt in self.statements:
+        try:
+            if x_y_axis:
+                stmt.x = stmt.x*-1
+            else:
+                stmt.y = stmt.y*-1
+
+        except AttributeError:
+            pass  # if no .x or .y then it's not a coordinate statement, do nothing
+
+        except TypeError:
+            pass # if .x or .y is NoneType then it's not a coordinate statement, do nothing
+
+    # *-1 the .primitives
+    for ind, primitive in enumerate(self.primitives):
+
+        if type(primitive) == gerber.primitives.Line:
+            if x_y_axis:
+                self.primitives[ind].start = (primitive.start[0]*-1, primitive.start[1])
+                self.primitives[ind].end = (primitive.end[0]*-1, primitive.end[1])
+            else:
+                self.primitives[ind].start = (primitive.start[0], primitive.start[1]*-1)
+                self.primitives[ind].end = (primitive.end[0], primitive.end[1]*-1)
+
+        else:
+            if x_y_axis:
+                self.primitives[ind].position = (primitive.position[0]*-1, primitive.position[1])
+            else:
+                self.primitives[ind].position = (primitive.position[0], primitive.position[1]*-1)
+
+    ### Step 2: recenter to original position
+    self.recenter_gerber_file(x_min, y_min)
 
 
-#############################################
+gerber.rs274x.GerberFile.mirror = gerber_mirror
+
+
+###############################################################
 
 
 
@@ -91,8 +189,6 @@ class GerberToShapely:
         '''
         polygon_list = []
         for shape in object_to_convert.primitives:
-            print(shape)
-            print(GerberToShapely(shape))
             polygon_list.append(GerberToShapely(shape))
 
         whole_thing = polygon_list[0]
@@ -422,15 +518,19 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile):
     pass
 
 if __name__ == '__main__':
-    gerber_file = 'gerber_files/limit_switch-F_Cu.gbr'
+    gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
     
     gerber_obj = gerber.read(gerber_file)
     #TODO: figure out how to MIRROR the gerber file
     #TODO: figure out how to move the gerber file
 
+
+    print(gerber_obj.primitives[80].start)
+    print(gerber_obj.bounds)
     # print(get_laser_coords(gerber_obj, debug=True))
-
-    print(get_holes_coords(gerber_obj))
-
+    gerber_obj.recenter_gerber_file(2, 2)
+    print(gerber_obj.primitives[80].start)
+    print(gerber_obj.bounds)
+    print(get_laser_coords(gerber_obj, debug=True))
 
     

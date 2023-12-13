@@ -46,13 +46,11 @@ def main(settings: Settings):
     gerber_obj = gerber.read(settings.src)
 
     # Recenter Gerber File with wanted Offset
-    #TODO: implement this
-    # gerber = Gerber.recenter_gerber_file(gerber, settings.x_offset, settings.y_offset)
+    gerber_obj.recenter_gerber_file(settings.x_offset, settings.y_offset)
 
     # Mirror Gerber File
     if settings.mirrored:
-        #TODO: implement this
-        # gerber = gerber.mirror()
+        gerber_obj.mirror()
         pass
 
     ### Creating the Gcode file
