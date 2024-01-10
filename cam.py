@@ -14,6 +14,8 @@ from copy import deepcopy
 import turtle
 import random
 
+DEFAULT_RESOLUTION = 5
+
 ############# Adding features to imported classes #############
 
 # 1: adding slicing feature to Point class from shapely
@@ -465,7 +467,7 @@ def visualize_group(group):
         print(f"Visualizaing Trace number: {num}")
     visualize(group[-1], terminate=True)
 
-def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, debug: bool=False):
+def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
 
@@ -474,6 +476,7 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
 
     :param gerber: Gerber Object from the gerber library
     :param include_edge_cuts: includes the edge cuts as part of pcb laser marking process
+    :param resolution: the number of decimal places for coordinates
     :param debug: enable debugging info and display laser motion
     :return: list of list of coordinates of one continious trace
 
@@ -490,28 +493,29 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
 
     whole_thing = list(whole_thing.geoms)
     coord_list_list = [list(polygon_.exterior.coords) for polygon_ in whole_thing]
-    coord_list_list = [[Point(coord) for coord in coord_list] for coord_list in coord_list_list]
+    coord_list_list = [[Point( round(coord[0], resolution), round(coord[1], resolution) ) for coord in coord_list] for coord_list in coord_list_list]
 
     if debug:
         visualize_group(whole_thing)
 
     return coord_list_list
 
-def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile):
+def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEFAULT_RESOLUTION) -> list[Point]:
     '''
     Gets list of coordinates where the spindle must go straight down in the Z axis to drill
 
     :param gerber: Gerber Object from the gerber library
+    :param resolution: the number of decimal places for coordinates
     :return: list of holes coordinates
     '''
     coord_list = []
     for primitive in gerber_obj.primitives:
         if type(primitive) != gerber.primitives.Line:
-            coord_list.append(Point(primitive.position))
+            coord_list.append(Point( round(primitive.position[0], resolution), round(primitive.position[1], resolution)))
 
     return coord_list
 
-def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile):
+def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile) -> list[Point]:
     '''
 
     '''

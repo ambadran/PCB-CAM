@@ -227,7 +227,7 @@ def general_machine_deinit() -> str:
     :return: machine deninitiation gcode
     '''
     gcode = ''
-    gcode += '; Machine deinitialization Sequence... \n\n'
+    gcode += '; Machine deinitialization Sequence... \n'
     gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(0, 0, 0))
     gcode += 'B0 ; Turn Machine OFF\n'
 
