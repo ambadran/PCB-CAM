@@ -69,6 +69,9 @@ if __name__ == '__main__':
     addArg('laser_passes', "Number of passes for laser marking Gcode", int)
     addArg('debug_laser', "Shows Simulation of the PCB laser trace coordinates", bool)
 
+    addArg('dont_export_gbr', "Doesn't allow exporting of the mirrored_and_offseted gerber file", bool)
+    addArg('new_gbr_name', "The name of the newly created Gerber File after mirroring and offsetting", str)
+
     ### Extracting User inputs!
     # Getting arguments
     settings.settings_dict.update(vars(parser.parse_args()))

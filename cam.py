@@ -137,6 +137,7 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
 
 gerber.rs274x.GerberFile.mirror = gerber_mirror
 
+# 4: adding exporting gerber file feature after it's altered!
 
 ###############################################################
 
@@ -522,12 +523,10 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile) -> list[Point]:
     pass
 
 if __name__ == '__main__':
-    gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
+    # gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
+    gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
     
     gerber_obj = gerber.read(gerber_file)
-    #TODO: figure out how to MIRROR the gerber file
-    #TODO: figure out how to move the gerber file
-
 
     print(gerber_obj.primitives[80].start)
     print(gerber_obj.bounds)

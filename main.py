@@ -7,6 +7,7 @@ My custom Gcode Generator :)))
 import gerber
 from gcode_tools import *
 import default_settings
+import os
 
 class Settings:
     '''
@@ -51,7 +52,12 @@ def main(settings: Settings):
     # Mirror Gerber File
     if settings.mirrored:
         gerber_obj.mirror()
-        pass
+
+    # Saving New Gerber File
+    if not settings.dont_export_gbr:
+        dir_path = os.path.dirname(settings.src)
+        dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
+        gerber_obj.write(dir_path_with_slash + settings.new_gbr_name)
 
     ### Creating the Gcode file
     gcode = ''

@@ -56,7 +56,6 @@ default_settings_dict = {
     # destination
     'dest': './default.gcode',
 
-
     # mirrored
     'mirrored': False,
 
@@ -65,6 +64,10 @@ default_settings_dict = {
     'ink': False,
     'laser': False,
     'holes': False,
+
+    # other options
+    'dont_export_gbr': False,  # saves the gbr file after recenter and mirror (if settings allow it)
+    'new_gbr_name': 'mirrored_and_offseted.gbr'
 
 
 }

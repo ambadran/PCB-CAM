@@ -607,11 +607,15 @@ def export_gcode(gcode: str, file_name: str) -> None:
 if __name__ == '__main__':
 
     #NOTE!!!! The gerber file is assumed to be mirrorred!!!!!
-    gerber_file_path = 'gerber_files/default.gbr'
+
+    gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
     # gerber_file_path = 'gerber_files/test2.gbr'
     # gerber_file_path = 'gerber_files/test.gbr'
-    gcode_file_path = 'gcode_files/default.gcode'
-    new_file_name = 'test2.gbr'
+
+    # gcode_file_path = 'gcode_files/default.gcode'
+    gcode_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/mirrored_and_offseted.gbr'
+
+    # new_file_name = 'test2.gbr'
 
     ##### Tweaking Arguments #####
 
@@ -658,7 +662,7 @@ if __name__ == '__main__':
 
     ### Main Code ###
     # Read the gerber file
-    gerber_obj = gerber.read(gerber_file)
+    gerber_obj = gerber.read(gerber_file_path)
 
     # Mirror Gerber File
     gerber_obj.mirror()
@@ -666,10 +670,10 @@ if __name__ == '__main__':
     # Recenter Gerber File with wanted Offset
     gerber_obj.recenter_gerber_file(x_offset, y_offset)
 
-    #TODO: implement this
-    # # gerber_obj.create_gerber_file('gerber_files/default.gbr')
+    # writing new gbr after mirroring and recentering
+    gerber_obj.write(gcode_file_path)
 
-    gcode = ''
+    # gcode = ''
 
 #     # Creating the holes_gcode
 #     gcode += generate_holes_gcode(gerber_obj, tool, router_Z_up_position, router_Z_down_position, router_feedrate_XY, router_feedrate_Z, spindle_speed, terminate_after = False)
@@ -677,11 +681,11 @@ if __name__ == '__main__':
 #     # Creating the PCB ink laying Gcode
 #     gcode += generate_ink_laying_gcode(gerber_obj, tool, tip_thickness, pen_down_position, ink_laying_feedrate, initiated_before=True, terminate_after = False)
 
-    # Creating the PCB trace laser Toner Transfer Gcode
-    gcode += generate_pcb_trace_gcode(gerber_obj, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
+    # # Creating the PCB trace laser Toner Transfer Gcode
+    # gcode += generate_pcb_trace_gcode(gerber_obj, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
 
-    # exporting the created Gcode
-    export_gcode(gcode, gcode_file_path)
+    # # exporting the created Gcode
+    # export_gcode(gcode, new_file_name)
 
 
 
