@@ -13,6 +13,7 @@ from matplotlib.patches import Ellipse
 from copy import deepcopy
 import turtle
 import random
+import math
 
 DEFAULT_RESOLUTION = 5
 
@@ -71,6 +72,16 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
         if type(primitive) == gerber.primitives.Line:
             self.primitives[ind].start = (primitive.start[0] + x_offset, primitive.start[1] + y_offset)
             self.primitives[ind].end = (primitive.end[0] + x_offset, primitive.end[1] + y_offset)
+
+        elif type(primitive) == gerber.primitives.Region:
+            for ind2, region_primitive in enumerate(primitive.primitives):
+                if type(region_primitive) == gerber.primitives.Line:
+                    self.primitives[ind].primitives[ind2].start = (region_primitive.start[0] + x_offset, region_primitive.start[1] + y_offset)
+                    self.primitives[ind].primitives[ind2].end = (region_primitive.end[0] + x_offset, region_primitive.end[1] + y_offset)
+
+                else:
+                    # Assuming all primitives inside Region object is line
+                    raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
         else:
             self.primitives[ind].position = (primitive.position[0] + x_offset, primitive.position[1] + y_offset)
@@ -327,7 +338,6 @@ class GerberToShapely:
 
         return Polygon(LinearRing(joined_quarters_coords))
 
-
     @classmethod
     def to_outline(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
@@ -363,13 +373,41 @@ class GerberToShapely:
         rectangle = box(object_to_convert.lower_left[0], object_to_convert.lower_left[1], object_to_convert.upper_right[0], object_to_convert.upper_right[1])
         return Polygon(LinearRing(list(rectangle.exterior.coords)))
 
-
     @classmethod
     def to_region(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
 
         '''
-        raise NotImplementedError("Region primitive gerber object convertion to Shapely method still not implemented")
+        print(object_to_convert.primitives[1:])
+        region_primitive = object_to_convert.primitives[0]
+        if type(region_primitive) == gerber.primitives.Line:
+            coord_list = [(region_primitive.start[0], region_primitive.start[1])]
+        else:
+            # Assuming all primitives inside Region object is Gerber Line object
+            raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+
+        for ind, region_primitive in enumerate(object_to_convert.primitives[1:]):
+            print('kdkd')
+            if type(region_primitive) == gerber.primitives.Line:
+
+                # Checking for discontiniouty errors
+                prev_region_primitive = object_to_convert.primitives[ind-1]
+                if not math.isclose(prev_region_primitive.end[0], region_primitive.start[0], rel_tol=1e-5) or not math.isclose(prev_region_primitive.end[1], region_primitive.start[1], rel_tol=1e-5):
+                    raise ValueError(f"Discontiniouty error, previous Gerber Line object ending coordinate {prev_region_primitive} is not the same as the current Gerber Line starting coordinate {region_primitive}")
+
+                #TODO: I noticed that some of the region primitive Line has start coord same as end coord, does this create problems??!!
+
+                # Appending the start of each line
+                coord_list.append((region_primitive.start[0], region_primitive.start[1]))
+
+            else:
+                # Assuming all primitives inside Region object is Gerber Line object
+                raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+
+        #TODO: Do I just return the coord_list??!
+        print(coord_list)
+        return Polygon(LineString(coord_list)).exterior
+
 
     @classmethod
     def to_round_butterfly(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
