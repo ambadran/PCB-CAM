@@ -363,7 +363,7 @@ class GerberToShapely:
         '''
 
         '''
-        raise NotImplementedError("Polygon primitive gerber object convertion to Shapely method still not implemented")
+        return Polygon(LinearRing(object_to_convert.vertices))
 
     @classmethod
     def to_rectangle(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
@@ -378,7 +378,8 @@ class GerberToShapely:
         '''
 
         '''
-        print(object_to_convert.primitives[1:])
+        # polygons = []
+
         region_primitive = object_to_convert.primitives[0]
         if type(region_primitive) == gerber.primitives.Line:
             coord_list = [(region_primitive.start[0], region_primitive.start[1])]
@@ -387,15 +388,17 @@ class GerberToShapely:
             raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
         for ind, region_primitive in enumerate(object_to_convert.primitives[1:]):
-            print('kdkd')
             if type(region_primitive) == gerber.primitives.Line:
 
                 # Checking for discontiniouty errors
-                prev_region_primitive = object_to_convert.primitives[ind-1]
+                prev_region_primitive = object_to_convert.primitives[ind]
                 if not math.isclose(prev_region_primitive.end[0], region_primitive.start[0], rel_tol=1e-5) or not math.isclose(prev_region_primitive.end[1], region_primitive.start[1], rel_tol=1e-5):
-                    raise ValueError(f"Discontiniouty error, previous Gerber Line object ending coordinate {prev_region_primitive} is not the same as the current Gerber Line starting coordinate {region_primitive}")
-
-                #TODO: I noticed that some of the region primitive Line has start coord same as end coord, does this create problems??!!
+                    # print(coord_list)
+                    # print(prev_region_primitive)
+                    # print(region_primitive)
+                    # polygons.append(Polygon(LinearRing(coord_list)))
+                    # coord_list = [(region_primitive.start[0], region_primitive.start[1])]
+                    raise ValueError("Discontinuoty Error")
 
                 # Appending the start of each line
                 coord_list.append((region_primitive.start[0], region_primitive.start[1]))
@@ -403,10 +406,16 @@ class GerberToShapely:
             else:
                 # Assuming all primitives inside Region object is Gerber Line object
                 raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+        # else:
+        #     # for the last sequence
+        #     polygons.append(Polygon(LinearRing(coord_list)))
 
-        #TODO: Do I just return the coord_list??!
-        print(coord_list)
-        return Polygon(LineString(coord_list)).exterior
+        # for polygon in polygons[:-1]:
+        #     visualize(polygon.exterior)
+        # visualize(polygons[-1].exterior, terminate=True)
+
+        # raise ValueError("breakpoint")
+        return Polygon(LineString(coord_list))
 
 
     @classmethod
@@ -459,9 +468,16 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     if type(line_string) != LineString and type(line_string) != LinearRing and type(line_string) != Polygon:
         raise ValueError("Must be of type shapely LineString")
 
-    turtle_window_size_x = 850
-    turtle_window_size_y = 580
-    turtle.Screen().setup(turtle_window_size_x, turtle_window_size_y)
+    # Calculate position to center the window
+    device_w = 1440 # 2560
+    device_h = 1160 # 1600
+    startx = 0
+    starty = 0
+
+    # Set up the turtle screen
+    screen = turtle.Screen()
+    screen.setup(width=device_w, height=device_h, startx=startx, starty=starty)
+
     skk = turtle.Turtle()
     turtle.width(line_width)
     turtle.speed(speed)
@@ -500,11 +516,24 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     if terminate:
         turtle.done()
 
-def visualize_group(group):
+def visualize_group(group, gbr_obj=None):
+    '''
+    visualizes a group of LineString or LinearRing
+    '''
+
+    # finding center to draw PCB in the center
+    if gbr_obj:
+        x_center = 2 + (gbr_obj.size[0]//2)
+        y_center = 2 + (gbr_obj.size[1]//2)
+        center_point = Point(x_center, y_center)
+    else:
+        center_point = Point(0, 0)
+
+    len_group = len(group)
     for num, sth in enumerate(group[:-1]):
-        visualize(sth)
-        print(f"Visualizaing Trace number: {num}")
-    visualize(group[-1], terminate=True)
+        print(f"Visualizaing Trace number: {num+1} out of {len_group}")
+        visualize(sth, x_offset=center_point.x, y_offset=center_point.y)
+    visualize(group[-1], x_offset=center_point.x, y_offset=center_point.y, terminate=True)
 
 def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
     '''
@@ -535,7 +564,7 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     coord_list_list = [[Point( round(coord[0], resolution), round(coord[1], resolution) ) for coord in coord_list] for coord_list in coord_list_list]
 
     if debug:
-        visualize_group(whole_thing)
+        visualize_group(whole_thing, gbr_obj=gerber_obj)
 
     return coord_list_list
 
