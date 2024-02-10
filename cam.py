@@ -463,13 +463,21 @@ class GerberToShapely:
         raise NotImplementedError("TestRecord primitive gerber object convertion to Shapely method still not implemented")
 
 def _turtle_move_trace(turtle, coord_list, x_offset, y_offset, multiplier):
-    turtle.up()
-    turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord_list[0][1] - y_offset) * multiplier)
-    turtle.down()
-    for coord in coord_list[1:-1]:
-        turtle.setpos((coord[0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
+    '''
 
-    turtle.setpos((coord_list[-1][0] - x_offset) * multiplier, (coord_list[-1][1] - y_offset) * multiplier)
+    '''
+    if coord_list:
+        turtle.up()
+        turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord_list[0][1] - y_offset) * multiplier)
+        turtle.down()
+        for coord in coord_list[1:-1]:
+            turtle.setpos((coord[0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
+
+        turtle.setpos((coord_list[-1][0] - x_offset) * multiplier, (coord_list[-1][1] - y_offset) * multiplier)
+
+    else:
+        print("Given Empty Coord list to simulate ?!?!")
+        raise ValueError("Given Empty Coord list to simulate ?!?!")
 
 def visualize(shape_to_sim: LineString | LinearRing | Polygon | list[Point], hide_turtle=True, speed=0, x_offset=40, y_offset=20, line_width=1.5, multiplier=8, terminate=False) -> None:
     '''
@@ -510,11 +518,11 @@ def visualize(shape_to_sim: LineString | LinearRing | Polygon | list[Point], hid
 
     elif type(shape_to_sim) in [LineString, LinearRing]:
         coord_list = list(shape_to_sim.coords)
-        _turtle_move_trace(turtle, coord_list_exterior, x_offset, y_offset, multiplier)
+        _turtle_move_trace(turtle, coord_list, x_offset, y_offset, multiplier)
 
     elif all((type(val) == Point) for val in shape_to_sim):
         coord_list = shape_to_sim
-        _turtle_move_trace(turtle, coord_list_exterior, x_offset, y_offset, multiplier)
+        _turtle_move_trace(turtle, coord_list, x_offset, y_offset, multiplier)
 
     else:
         raise ValueError(f"<shape_to_sim> argument must be of type shapely LineString or LinearRing or Polygon or list[Point]\nGiven type is {type(shape_to_sim)}")
@@ -539,7 +547,7 @@ def visualize_group(group, gbr_obj=None):
     else:
         center_point = Point(0, 0)
 
-    len_group = len(group)
+    len_group = len(group) - 1
     for num, sth in enumerate(group[:-1]):
         print(f"Visualizaing Trace number: {num+1} out of {len_group}")
         visualize(sth, x_offset=center_point.x, y_offset=center_point.y)
@@ -565,14 +573,14 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     '''
 
     # Converting the Gerber Object to Shapely Objects into a dark group and a light group
-    shapely_objects_dark = []
-    shapely_objects_clear = []
+    shapely_objects_dark = {}
+    shapely_objects_clear = {}
     for gerber_primitive in gerber_obj.primitives:
         if gerber_primitive.level_polarity == 'dark':
-            shapely_objects_dark.append(GerberToShapely(gerber_primitive))
+            shapely_objects_dark[GerberToShapely(gerber_primitive)] = gerber_primitive
 
         elif gerber_primitive.level_polarity == 'clear':
-            shapely_objects_clear.append(GerberToShapely(gerber_primitive))
+            shapely_objects_clear[GerberToShapely(gerber_primitive)] = gerber_primitive
 
         else:
             raise ValueError(f"Unsupported level_polarity: {gerber_primitive.level_polarity}")
@@ -580,12 +588,14 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     # Subtracting each dark group from all light groups, 
     # (as there is no way to know which shape is supposed to subtract which shape (as far as I know))
     shapely_objects_dark_subtracted = []
-    for dark_obj in shapely_objects_dark:
+    for shapely_obj_d, gbr_obj_d in shapely_objects_dark.items():
 
-        for light_obj in shapely_objects_clear:
-            dark_obj = dark_obj.difference(light_obj)
+        #NOTE: I assume that the only Gerber Objects that have difference operation applied to them by clear objects are 'Region'
+        if type(gbr_obj_d) == gerber.rs274x.Region:
+            for light_obj in shapely_objects_clear.keys():
+                shapely_obj_d = shapely_obj_d.difference(light_obj)
 
-        shapely_objects_dark_subtracted.append(dark_obj)
+        shapely_objects_dark_subtracted.append(shapely_obj_d)
 
     # Union all dark group shapes together to form a MultiPolygon Object with all the Polygons that intersect joined
     whole_thing = shapely_objects_dark_subtracted[0]
@@ -619,7 +629,9 @@ def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEF
     '''
     coord_list = []
     for primitive in gerber_obj.primitives:
-        if type(primitive) != gerber.primitives.Line:
+
+        # Add any position of any Gerber object that is not a Trace
+        if type(primitive) not in [gerber.rs274x.Line, gerber.rs274x.Region]:
             coord_list.append(Point( round(primitive.position[0], resolution), round(primitive.position[1], resolution)))
 
     return coord_list
@@ -633,9 +645,11 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile) -> list[Point]:
 if __name__ == '__main__':
     # gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
     # gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
-    gerber_file_path = "gerber_files/region_object.gbr"
+    gerber_file= "gerber_files/region_object.gbr"
     
     gerber_obj = gerber.read(gerber_file)
+
+    print(get_laser_coords(gerber_obj, debug=True))
 
     
    
