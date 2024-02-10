@@ -89,6 +89,9 @@ def main(settings: Settings):
     # exporting the created Gcode
     export_gcode(gcode, settings.dest)
 
+    # End statement
+    print(f"\n\nPCB Dimension Width: {gerber_obj.size[0]}, Height: {gerber_obj.size[1]}.")
+
 
 # just a test
 if __name__ == '__main__':
