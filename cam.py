@@ -83,6 +83,7 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
+        #TODO: must implement a type check for the rest of the Gerber Shape Types
         else:
             self.primitives[ind].position = (primitive.position[0] + x_offset, primitive.position[1] + y_offset)
 
@@ -136,6 +137,22 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
                 self.primitives[ind].start = (primitive.start[0], primitive.start[1]*-1)
                 self.primitives[ind].end = (primitive.end[0], primitive.end[1]*-1)
 
+        elif type(primitive) == gerber.primitives.Region:
+            for ind2, region_primitive in enumerate(primitive.primitives):
+                if type(region_primitive) == gerber.primitives.Line:
+                    if x_y_axis:
+                        self.primitives[ind].primitives[ind2].start = (region_primitive.start[0]*-1, region_primitive.start[1])
+                        self.primitives[ind].primitives[ind2].end = (region_primitive.end[0]*-1, region_primitive.end[1])
+
+                    else:
+                        self.primitives[ind].primitives[ind2].start = (region_primitive.start[0], region_primitive.start[1]*-1)
+                        self.primitives[ind].primitives[ind2].end = (region_primitive.end[0], region_primitive.end[1]*-1)
+
+                else:
+                    # Assuming all primitives inside Region object is line
+                    raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+
+        #TODO: must implement a type check for the rest of the Gerber Shape Types
         else:
             if x_y_axis:
                 self.primitives[ind].position = (primitive.position[0]*-1, primitive.position[1])
@@ -151,7 +168,6 @@ gerber.rs274x.GerberFile.mirror = gerber_mirror
 # 4: adding exporting gerber file feature after it's altered!
 
 ###############################################################
-
 
 
 class GerberToShapely:
@@ -378,7 +394,6 @@ class GerberToShapely:
         '''
 
         '''
-        # polygons = []
 
         region_primitive = object_to_convert.primitives[0]
         if type(region_primitive) == gerber.primitives.Line:
@@ -393,11 +408,6 @@ class GerberToShapely:
                 # Checking for discontiniouty errors
                 prev_region_primitive = object_to_convert.primitives[ind]
                 if not math.isclose(prev_region_primitive.end[0], region_primitive.start[0], rel_tol=1e-5) or not math.isclose(prev_region_primitive.end[1], region_primitive.start[1], rel_tol=1e-5):
-                    # print(coord_list)
-                    # print(prev_region_primitive)
-                    # print(region_primitive)
-                    # polygons.append(Polygon(LinearRing(coord_list)))
-                    # coord_list = [(region_primitive.start[0], region_primitive.start[1])]
                     raise ValueError("Discontinuoty Error")
 
                 # Appending the start of each line
@@ -406,15 +416,7 @@ class GerberToShapely:
             else:
                 # Assuming all primitives inside Region object is Gerber Line object
                 raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
-        # else:
-        #     # for the last sequence
-        #     polygons.append(Polygon(LinearRing(coord_list)))
 
-        # for polygon in polygons[:-1]:
-        #     visualize(polygon.exterior)
-        # visualize(polygons[-1].exterior, terminate=True)
-
-        # raise ValueError("breakpoint")
         return Polygon(LineString(coord_list))
 
 
@@ -460,13 +462,19 @@ class GerberToShapely:
         '''
         raise NotImplementedError("TestRecord primitive gerber object convertion to Shapely method still not implemented")
 
+def _turtle_move_trace(turtle, coord_list, x_offset, y_offset, multiplier):
+    turtle.up()
+    turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord_list[0][1] - y_offset) * multiplier)
+    turtle.down()
+    for coord in coord_list[1:-1]:
+        turtle.setpos((coord[0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
 
-def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y_offset=20, line_width=1.5, multiplier=8, terminate=False) -> None:
+    turtle.setpos((coord_list[-1][0] - x_offset) * multiplier, (coord_list[-1][1] - y_offset) * multiplier)
+
+def visualize(shape_to_sim: LineString | LinearRing | Polygon | list[Point], hide_turtle=True, speed=0, x_offset=40, y_offset=20, line_width=1.5, multiplier=8, terminate=False) -> None:
     '''
-    visualizes the linked list
+    visualizes the shape object
     '''
-    if type(line_string) != LineString and type(line_string) != LinearRing and type(line_string) != Polygon:
-        raise ValueError("Must be of type shapely LineString")
 
     # Calculate position to center the window
     device_w = 1440 # 2560
@@ -492,21 +500,24 @@ def visualize(line_string: LineString, hide_turtle=True, speed=0, x_offset=40, y
     #     color = random.choice(colors)
 
     turtle.pencolor(color)
-    if type(line_string) == Polygon:
-        coord_list = list(line_string.exterior.coords)
+    if type(shape_to_sim) == Polygon:
+        coord_list_exterior = list(shape_to_sim.exterior.coords)
+        coord_list_list_interiors = list(shape_to_sim.interiors)
+
+        _turtle_move_trace(turtle, coord_list_exterior, x_offset, y_offset, multiplier)
+        for coord_list_interior in coord_list_list_interiors:
+            _turtle_move_trace(turtle, list(coord_list_interior.coords), x_offset, y_offset, multiplier)
+
+    elif type(shape_to_sim) in [LineString, LinearRing]:
+        coord_list = list(shape_to_sim.coords)
+        _turtle_move_trace(turtle, coord_list_exterior, x_offset, y_offset, multiplier)
+
+    elif all((type(val) == Point) for val in shape_to_sim):
+        coord_list = shape_to_sim
+        _turtle_move_trace(turtle, coord_list_exterior, x_offset, y_offset, multiplier)
 
     else:
-        coord_list = list(line_string.coords)
-
-    turtle.up()
-    turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord_list[0][1] - y_offset) * multiplier)
-    turtle.down()
-    for coord in coord_list[1:-1]:
-        turtle.setpos((coord[0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
-
-    turtle.setpos((coord_list[-1][0] - x_offset) * multiplier, (coord_list[-1][1] - y_offset) * multiplier)
-    # if coord_list[0] == coord_list[-1]:
-    #     turtle.setpos((coord_list[0][0] - x_offset) * multiplier, (coord[1] - y_offset) * multiplier)
+        raise ValueError(f"<shape_to_sim> argument must be of type shapely LineString or LinearRing or Polygon or list[Point]\nGiven type is {type(shape_to_sim)}")
 
     # Graph.used_colors.add(color)
     # if len(Graph.used_colors) == len(colors):
@@ -520,7 +531,6 @@ def visualize_group(group, gbr_obj=None):
     '''
     visualizes a group of LineString or LinearRing
     '''
-
     # finding center to draw PCB in the center
     if gbr_obj:
         x_center = 2 + (gbr_obj.size[0]//2)
@@ -533,6 +543,8 @@ def visualize_group(group, gbr_obj=None):
     for num, sth in enumerate(group[:-1]):
         print(f"Visualizaing Trace number: {num+1} out of {len_group}")
         visualize(sth, x_offset=center_point.x, y_offset=center_point.y)
+
+    print(f"Visualizaing Trace number: {num+1} out of {len_group}")
     visualize(group[-1], x_offset=center_point.x, y_offset=center_point.y, terminate=True)
 
 def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
@@ -551,20 +563,49 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     #TODO: implement include_edge_cuts functionality
     #TODO: think about whether to round here or in the gcode_tools functions
     '''
-    shapely_objects = []
-    for num, gerber_primitive in enumerate(gerber_obj.primitives):
-        shapely_objects.append(GerberToShapely(gerber_primitive))
 
-    whole_thing = shapely_objects[0]
-    for num, shapely_object in enumerate(shapely_objects[1:]):
+    # Converting the Gerber Object to Shapely Objects into a dark group and a light group
+    shapely_objects_dark = []
+    shapely_objects_clear = []
+    for gerber_primitive in gerber_obj.primitives:
+        if gerber_primitive.level_polarity == 'dark':
+            shapely_objects_dark.append(GerberToShapely(gerber_primitive))
+
+        elif gerber_primitive.level_polarity == 'clear':
+            shapely_objects_clear.append(GerberToShapely(gerber_primitive))
+
+        else:
+            raise ValueError(f"Unsupported level_polarity: {gerber_primitive.level_polarity}")
+
+    # Subtracting each dark group from all light groups, 
+    # (as there is no way to know which shape is supposed to subtract which shape (as far as I know))
+    shapely_objects_dark_subtracted = []
+    for dark_obj in shapely_objects_dark:
+
+        for light_obj in shapely_objects_clear:
+            dark_obj = dark_obj.difference(light_obj)
+
+        shapely_objects_dark_subtracted.append(dark_obj)
+
+    # Union all dark group shapes together to form a MultiPolygon Object with all the Polygons that intersect joined
+    whole_thing = shapely_objects_dark_subtracted[0]
+    for shapely_object in shapely_objects_dark_subtracted[1:]:
         whole_thing = whole_thing.union(shapely_object)
-
     whole_thing = list(whole_thing.geoms)
+
+    # Getting list of list of extrior coordinate of each Shapley Polygon
     coord_list_list = [list(polygon_.exterior.coords) for polygon_ in whole_thing]
-    coord_list_list = [[Point( round(coord[0], resolution), round(coord[1], resolution) ) for coord in coord_list] for coord_list in coord_list_list]
+    coord_list_list = [ [ Point( round(coord[0], resolution), round(coord[1], resolution) ) for coord in coord_list ] for coord_list in coord_list_list]
+
+    # Getting list of list of all interiors coordinate lists of each Shapely Polygon
+    tmp = [list(interior.coords) for polygon_ in whole_thing for interior in polygon_.interiors]
+    tmp = [ [ Point( round(coord[0], resolution), round(coord[1], resolution) ) for coord in tmp_ ] for tmp_ in tmp ]
+
+    # Joinging the exterior and interiors lists of Points
+    coord_list_list.extend(tmp)
 
     if debug:
-        visualize_group(whole_thing, gbr_obj=gerber_obj)
+        visualize_group(coord_list_list, gbr_obj=gerber_obj)
 
     return coord_list_list
 
@@ -591,16 +632,10 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile) -> list[Point]:
 
 if __name__ == '__main__':
     # gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
-    gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
+    # gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
+    gerber_file_path = "gerber_files/region_object.gbr"
     
     gerber_obj = gerber.read(gerber_file)
 
-    print(gerber_obj.primitives[80].start)
-    print(gerber_obj.bounds)
-    # print(get_laser_coords(gerber_obj, debug=True))
-    gerber_obj.recenter_gerber_file(2, 2)
-    print(gerber_obj.primitives[80].start)
-    print(gerber_obj.bounds)
-    print(get_laser_coords(gerber_obj, debug=True))
-
     
+   
