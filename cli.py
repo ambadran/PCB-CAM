@@ -57,6 +57,7 @@ if __name__ == '__main__':
     addArg('dest', "Destination Gcode file", str, 'D')
 
     addArg('mirrored', "Mirror Given Srouce Gerber file. Used for traces of DIP components", bool, 'M')
+    addArg('rotated', "Rotate 90degrees Given Srouce Gerber file. Used for traces of DIP components", bool, 'R')
 
     addArg('x_offset', "Value PCB offseted from X axis", int)
     addArg('y_offset', "Value PCB offseted from Y axis", int)
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     addArg('laser', "Adds laser drawing gcode to Gcode file", bool)
     addArg('include_edge_cuts', "Include Edge cuts in laser marking process", bool)
     addArg('laser_passes', "Number of passes for laser marking Gcode", int)
-    addArg('debug_laser', "Shows Simulation of the PCB laser trace coordinates", bool)
+    addArg('debug', "Shows Simulation of the PCB laser trace coordinates as well as other debug Info.", bool)
 
     addArg('dont_export_gbr', "Doesn't allow exporting of the mirrored_and_offseted gerber file", bool)
     addArg('new_gbr_name', "The name of the newly created Gerber File after mirroring and offsetting", str)

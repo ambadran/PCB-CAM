@@ -14,6 +14,14 @@ from copy import deepcopy
 import turtle
 import random
 import math
+import numpy as np
+
+# Screen Dimensions
+DEVICE_W = 1440 # 2560
+DEVICE_H = 1160 # 1600
+START_X = 0
+START_Y = 0
+
 
 DEFAULT_RESOLUTION = 5
 
@@ -165,7 +173,85 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
 
 gerber.rs274x.GerberFile.mirror = gerber_mirror
 
-# 4: adding exporting gerber file feature after it's altered!
+# 4: adding 90 degree rotation to invert width and height
+def rotate_point(point: tuple[float, float], angle_degrees) -> tuple[float, float]:
+    '''
+    given a shapely.Point argument, this function will use matrix dot multiplication 
+    to multiply the given 2d coordinate to rotate it angle_degrees, then 
+    return a shapely.Point
+    '''
+    # Unpack the point tuple
+    x, y = point[0], point[1]
+
+    # Convert angle from degrees to radians
+    angle_radians = math.radians(angle_degrees)
+
+    # Calculate the cosine and sine of the angle
+    cos_theta = math.cos(angle_radians)
+    sin_theta = math.sin(angle_radians)
+
+    # Apply the rotation
+    x_rotated = x * cos_theta - y * sin_theta
+    y_rotated = x * sin_theta + y * cos_theta
+
+    # Return the rotated point as a tuple
+    return (round(x_rotated, 5), round(y_rotated, 5))
+
+def gerber_rotate_90(self):
+    '''
+    Rotate the gerber file (for DIP components)
+
+    Procedure:
+    Step-1: switch x and y coordinates
+    Step-2: recenter to (x_min, y_min) (which is measured before step 1!!) 
+    Done :D
+
+    '''
+    # Get X and Y, min for step2 and switching them
+    bounds = self.bounds
+    x_min = bounds[0][0]
+    y_min = bounds[1][0]
+
+    # Step 1: invert x and y coordinates
+    # Step 1a: for .statements
+    for stmt in self.statements:
+        try:
+            new_stmt_point = rotate_point((stmt.x, stmt.y), 90)
+            stmt.x = new_stmt_point[0]
+            stmt.y = new_stmt_point[1]
+
+        except AttributeError:
+            pass  # if no .x or .y then it's not a coordinate statement, do nothing
+
+        except TypeError:
+            pass # if .x or .y is NoneType then it's not a coordinate statement, do nothing
+
+    # Step1b: for .primitives
+    for ind, primitive in enumerate(self.primitives):
+
+        if type(primitive) == gerber.primitives.Line:
+            self.primitives[ind].start = rotate_point(primitive.start, 90)
+            self.primitives[ind].end = rotate_point(primitive.end, 90)
+
+        elif type(primitive) == gerber.primitives.Region:
+            for ind2, region_primitive in enumerate(primitive.primitives):
+                if type(region_primitive) == gerber.primitives.Line:
+                    self.primitives[ind].primitives[ind2].start = rotate_point(region_primitive.start, 90)
+                    self.primitives[ind].primitives[ind2].end = rotate_point(region_primitive.end, 90)
+
+                else:
+                    # Assuming all primitives inside Region object is line
+                    raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+
+        else:
+            self.primitives[ind].position = rotate_point(primitive.position, 90)
+
+
+    ### Step 2: recenter to original position
+    self.recenter_gerber_file(x_min, y_min)
+
+
+gerber.rs274x.GerberFile.rotate_90 = gerber_rotate_90
 
 ###############################################################
 
@@ -484,15 +570,9 @@ def visualize(shape_to_sim: LineString | LinearRing | Polygon | list[Point], hid
     visualizes the shape object
     '''
 
-    # Calculate position to center the window
-    device_w = 1440 # 2560
-    device_h = 1160 # 1600
-    startx = 0
-    starty = 0
-
     # Set up the turtle screen
     screen = turtle.Screen()
-    screen.setup(width=device_w, height=device_h, startx=startx, starty=starty)
+    screen.setup(width=DEVICE_W, height=DEVICE_H, startx=START_X, starty=START_Y)
 
     skk = turtle.Turtle()
     turtle.width(line_width)
@@ -539,21 +619,27 @@ def visualize_group(group, gbr_obj=None):
     '''
     visualizes a group of LineString or LinearRing
     '''
-    # finding center to draw PCB in the center
+    # Calculating Offset by finding center to draw PCB in the center
     if gbr_obj:
         x_center = 2 + (gbr_obj.size[0]//2)
         y_center = 2 + (gbr_obj.size[1]//2)
-        center_point = Point(x_center, y_center)
+
     else:
-        center_point = Point(0, 0)
+        x_center = 0
+        y_center = 0
+
+    # Calculating Multiplier
+    # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
+    # multiplier /= 2
+    multiplier = 5
 
     len_group = len(group) - 1
     for num, sth in enumerate(group[:-1]):
         print(f"Visualizaing Trace number: {num+1} out of {len_group}")
-        visualize(sth, x_offset=center_point.x, y_offset=center_point.y)
+        visualize(sth, x_offset=x_center, y_offset=y_center, multiplier=multiplier)
 
     print(f"Visualizaing Trace number: {num+1} out of {len_group}")
-    visualize(group[-1], x_offset=center_point.x, y_offset=center_point.y, terminate=True)
+    visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
 def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
     '''
@@ -619,7 +705,7 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
 
     return coord_list_list
 
-def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEFAULT_RESOLUTION) -> list[Point]:
+def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[Point]:
     '''
     Gets list of coordinates where the spindle must go straight down in the Z axis to drill
 
@@ -630,15 +716,17 @@ def get_holes_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEF
     coord_list = []
     for primitive in gerber_obj.primitives:
 
-        # Add any position of any Gerber object that is not a Trace
+        # Add any position of any Gerber object that is not a Trace; thus a ComponentPad
         if type(primitive) not in [gerber.rs274x.Line, gerber.rs274x.Region]:
             coord_list.append(Point( round(primitive.position[0], resolution), round(primitive.position[1], resolution)))
 
+    if debug:
+        print(f"Number of holes to drill: {len(coord_list)}")
+
     return coord_list
 
-def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile) -> list[Point]:
+def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> list[Point]:
     '''
-
     '''
     pass
 

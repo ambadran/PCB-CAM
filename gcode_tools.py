@@ -367,7 +367,7 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
 
 def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, motor_up_z_position: int, 
         motor_down_z_position: int, feedrate_XY: int, feedrate_Z_drilling: int, feedrate_Z_up_from_pcb: int, 
-        spindle_speed: int) -> str:
+        spindle_speed: int, debug: bool=False) -> str:
     '''
     Takes in String gerber file content, identifies the PCB holes and generates the Gcode to drill the holes from begging to end!
 
@@ -407,7 +407,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     # Cutting starts here :)
 
     #TODO: fix this line to return the coordinates using the python gerber library. I am still not sure how to extract componentPad coords
-    coordinates = get_holes_coords(gerber_obj)
+    coordinates = get_holes_coords(gerber_obj, debug=debug)
 
     for coordinate in coordinates:
         gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate, feedrate=feedrate_XY)
@@ -425,7 +425,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
 
 
 def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, tip_thickness: float, pen_down_position: int, 
-        feedrate: int) -> str:
+        feedrate: int, debug: bool=False) -> str:
     '''
     :param gerber: Gerber Object from the gerber library
     :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool

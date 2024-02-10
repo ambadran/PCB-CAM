@@ -50,8 +50,6 @@ default_settings_dict = {
     "include_edge_cuts": True,
     # Laser Gcode Passes
     "laser_passes": 1,
-    # Show laser Gcode Creation Debugging info and visualization :)
-    'debug_laser': False,
 
     # destination
     'dest': './default.gcode',
@@ -59,13 +57,20 @@ default_settings_dict = {
     # mirrored
     'mirrored': False,
 
+    # rotated
+    'rotated': False,
+
     # Gcode Modes
     'all_gcode': False,
     'ink': False,
     'laser': False,
     'holes': False,
 
+    # Show Gcode Creation Debugging info and visualization :)
+    'debug': False,
+
     # other options
+
     'dont_export_gbr': False,  # saves the gbr file after recenter and mirror (if settings allow it)
     'new_gbr_name': 'mirrored_and_offseted.gbr'
 

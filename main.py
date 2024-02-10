@@ -53,6 +53,10 @@ def main(settings: Settings):
     if settings.mirrored:
         gerber_obj.mirror()
 
+    # Rotate Gerber File
+    if settings.rotated:
+        gerber_obj.rotate_90()
+
     # Saving New Gerber File
     if not settings.dont_export_gbr:
         dir_path = os.path.dirname(settings.src)
@@ -60,7 +64,8 @@ def main(settings: Settings):
         gerber_obj.write(dir_path_with_slash + settings.new_gbr_name)
 
     ### Creating the Gcode file
-    gcode = ''
+    gcode = ""
+    debug_msg = f"\n\nPCB Dimension Width: {gerber_obj.size[0]}, Height: {gerber_obj.size[1]}.\n\n"
 
     # Machine Init
     gcode += general_machine_init()
@@ -68,20 +73,23 @@ def main(settings: Settings):
     # Creating the PCB ink laying Gcode
     if settings.all_gcode or settings.ink:
         gcode += generate_ink_laying_gcode(gerber_obj, settings.tool, settings.tip_thickness, 
-                                           settings.pen_down_position, settings.ink_laying_feedrate)
+                                           settings.pen_down_position, settings.ink_laying_feedrate, debug=settings.debug)
+        debug_msg += "Exported Ink Laying Gcode..\n"
 
     # Creating the PCB trace laser Toner Transfer Gcode
     if settings.all_gcode or settings.laser:
         gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
                 settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
-                debug=settings.debug_laser)
+                debug=settings.debug)
+        debug_msg += "Exported laser trace isolation Gcode..\n"
 
     # Creating the holes_gcode
     if settings.all_gcode or settings.holes:
         gcode += generate_holes_gcode(gerber_obj, settings.tool, settings.router_Z_up_position, 
                                       settings.router_Z_down_position, settings.router_feedrate_XY, 
                                       settings.router_feedrate_Z_drilling, settings.router_feedrate_Z_up_from_pcb,
-                                      settings.spindle_speed)
+                                      settings.spindle_speed, debug=settings.debug)
+        debug_msg += "Exported spindle hole drilling Gcode..\n"
 
     # Machine Deinit
     gcode += general_machine_deinit()
@@ -90,7 +98,7 @@ def main(settings: Settings):
     export_gcode(gcode, settings.dest)
 
     # End statement
-    print(f"\n\nPCB Dimension Width: {gerber_obj.size[0]}, Height: {gerber_obj.size[1]}.")
+    print(debug_msg)
 
 
 # just a test
