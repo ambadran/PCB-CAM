@@ -29,7 +29,7 @@ default_settings_dict = {
     "router_feedrate_Z_drilling": 1,
     "router_feedrate_Z_up_from_pcb": 20,
     # Power intensities
-    "spindle_speed": 230,
+    "spindle_speed": 255,
 
     ### Pen Tweaking Values
     # Z positions

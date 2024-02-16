@@ -392,7 +392,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     gcode += f'F{feedrate_XY} ; setting default feedrate\n\n'
 
     # setting the S value which sets pwm speed when we enable it, 
-    if spindle_speed < 0 or spindle_speed > 250:
+    if spindle_speed < 0 or spindle_speed > 256:
         raise ValueError("spindle_speed is only from 0-250")
     gcode += f'S{spindle_speed} ; sets pwm speed when we enable it\n\n'
 
