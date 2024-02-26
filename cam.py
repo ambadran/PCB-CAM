@@ -57,6 +57,7 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
     :param x_offset: wanted x offset from origin. if 0 then pcb will start at 0
     :param y_offset: wanted y offset from origin. if 0 then pcb will start at 0
     '''
+
     # Get X and Y, min and max
     bounds = self.bounds
     x_min = bounds[0][0]
@@ -91,13 +92,19 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
-        #TODO: must implement a type check for the rest of the Gerber Shape Types
+        elif type(primitive) == gerber.primitives.Arc:
+            raise NotImplementedError("\nI need to implement Arc\n")
+
         else:
+            # Check if this Gerber type is implemented
+            try:
+                tmp = GerberToShapely(primitive)
+            except NotImplementedError:
+                print(f"\nThis Gerber Object {type(primitive)} isn't implemented how to recenter!\n\n")
+                raise
+
             self.primitives[ind].position = (primitive.position[0] + x_offset, primitive.position[1] + y_offset)
 
-    # print(self.primitives[80].start)
-    # self.primitives[80].start = (self.primitives[80].start[0] + x_offset, self.primitives[80].start[1] + y_offset)
-    # print(self.primitives[80].start)
 
 gerber.rs274x.GerberFile.recenter_gerber_file = recenter_gerber_file
 
@@ -160,8 +167,17 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
-        #TODO: must implement a type check for the rest of the Gerber Shape Types
+        elif type(primitive) == gerber.primitives.Arc:
+            raise NotImplementedError("\nI need to implement Arc\n")
+
         else:
+            # Check if this Gerber type is implemented
+            try:
+                tmp = GerberToShapely(primitive)
+            except NotImplementedError:
+                print(f"\nThis Gerber Object {type(primitive)} isn't implemented how to recenter!\n\n")
+                raise
+
             if x_y_axis:
                 self.primitives[ind].position = (primitive.position[0]*-1, primitive.position[1])
             else:
@@ -243,7 +259,17 @@ def gerber_rotate_90(self):
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
+        elif type(primitive) == gerber.primitives.Arc:
+            raise NotImplementedError("\nI need to implement Arc\n")
+
         else:
+            # Check if this Gerber type is implemented
+            try:
+                tmp = GerberToShapely(primitive)
+            except NotImplementedError:
+                print(f"\nThis Gerber Object {type(primitive)} isn't implemented how to recenter!\n\n")
+                raise
+
             self.primitives[ind].position = rotate_point(primitive.position, 90)
 
 
