@@ -69,13 +69,11 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
     x_offset = -x_min + x_offset
     y_offset = -y_min + y_offset
 
-    # Changing the statements attribute, the .bounds method is a property method depending on .statements
+    # Step 1a: Changing the statements attribute, the .bounds method is a property method depending on .statements
     for stmt in self.statements:
         stmt.offset(x_offset, y_offset)
 
-    #TODO: I think there might be a way to create a new gerber file from the new statements generated from this loop
-    
-    # Changing the primitive attribute
+    # Step 1b: Changing the primitive attribute
     for ind, primitive in enumerate(self.primitives):
 
         if type(primitive) == gerber.primitives.Line:
@@ -127,21 +125,16 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
 
 
     ### Step 1: *-1
-    # *-1 the .statements, the .bounds method is a property method depending on .statements
+    # Step1a: *-1 the .statements, the .bounds method is a property method depending on .statements
     for stmt in self.statements:
-        try:
-            if x_y_axis:
-                stmt.x = stmt.x*-1
-            else:
-                stmt.y = stmt.y*-1
+        if hasattr(stmt, 'x') and hasattr(stmt, 'y'):
+            if type(stmt.x) in [int, float] and type(stmt.y) in [int, float]:
+                if x_y_axis:
+                    stmt.x = stmt.x*-1
+                else:
+                    stmt.y = stmt.y*-1
 
-        except AttributeError:
-            pass  # if no .x or .y then it's not a coordinate statement, do nothing
-
-        except TypeError:
-            pass # if .x or .y is NoneType then it's not a coordinate statement, do nothing
-
-    # *-1 the .primitives
+    # Step1b: *-1 the .primitives
     for ind, primitive in enumerate(self.primitives):
 
         if type(primitive) == gerber.primitives.Line:
@@ -231,16 +224,16 @@ def gerber_rotate_90(self):
     # Step 1: invert x and y coordinates
     # Step 1a: for .statements
     for stmt in self.statements:
-        try:
-            new_stmt_point = rotate_point((stmt.x, stmt.y), 90)
-            stmt.x = new_stmt_point[0]
-            stmt.y = new_stmt_point[1]
+        if hasattr(stmt, 'x') and hasattr(stmt, 'y'):
+            if type(stmt.x) in [int, float] and type(stmt.y) in [int, float]:
+                new_stmt_point = rotate_point((stmt.x, stmt.y), 90)
+                stmt.x = new_stmt_point[0]
+                stmt.y = new_stmt_point[1]
 
-        except AttributeError:
-            pass  # if no .x or .y then it's not a coordinate statement, do nothing
+        elif hasattr(stmt, 'modifiers'):
+            if len(stmt.modifiers[0]) > 1:
+                stmt.modifiers[0] = (stmt.modifiers[0][1], stmt.modifiers[0][0])
 
-        except TypeError:
-            pass # if .x or .y is NoneType then it's not a coordinate statement, do nothing
 
     # Step1b: for .primitives
     for ind, primitive in enumerate(self.primitives):
@@ -259,6 +252,7 @@ def gerber_rotate_90(self):
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
+
         elif type(primitive) == gerber.primitives.Arc:
             raise NotImplementedError("\nI need to implement Arc\n")
 
@@ -271,7 +265,10 @@ def gerber_rotate_90(self):
                 raise
 
             self.primitives[ind].position = rotate_point(primitive.position, 90)
-
+            
+            # must invert height and width when rotating 90 degrees
+            if hasattr(primitive, 'width') and hasattr(primitive, 'height'):
+                self.primitives[ind].width, self.primitives[ind].height = primitive.height, primitive.width
 
     ### Step 2: recenter to original position
     self.recenter_gerber_file(x_min, y_min)
@@ -659,12 +656,12 @@ def visualize_group(group, gbr_obj=None):
     # multiplier /= 2
     multiplier = 5
 
-    len_group = len(group) - 1
+    len_group = len(group)
     for num, sth in enumerate(group[:-1]):
         print(f"Visualizaing Trace number: {num+1} out of {len_group}")
         visualize(sth, x_offset=x_center, y_offset=y_center, multiplier=multiplier)
 
-    print(f"Visualizaing Trace number: {num+1} out of {len_group}")
+    print(f"Visualizaing Trace number: {num+2} out of {len_group}")
     visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
 def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
