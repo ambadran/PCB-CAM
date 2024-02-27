@@ -88,10 +88,10 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
 
                 else:
                     # Assuming all primitives inside Region object is line
-                    raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
+                    raise NotImplementedError(f"I thought all primitives inside a Region object is Line primitives only, found {type(primitive)}")
 
         elif type(primitive) == gerber.primitives.Arc:
-            raise NotImplementedError("\nI need to implement Arc\n")
+            self.primitives[ind].center = (primitive.center[0] + x_offset, primitive.center[1] + y_offset)
 
         else:
             # Check if this Gerber type is implemented
@@ -133,6 +133,7 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
                     stmt.x = stmt.x*-1
                 else:
                     stmt.y = stmt.y*-1
+        #TODO: does start and end angle of gerber.primitives.Arc need changing?!?!?
 
     # Step1b: *-1 the .primitives
     for ind, primitive in enumerate(self.primitives):
@@ -161,7 +162,12 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
         elif type(primitive) == gerber.primitives.Arc:
-            raise NotImplementedError("\nI need to implement Arc\n")
+            if x_y_axis:
+                self.primitives[ind].center = (primitive.center[0]*-1, primitive.center[1])
+
+            else:
+                self.primitives[ind].center = (primitive.center[0], primitive.center[1]*-1)
+            #TODO: does start and end angle of gerber.primitives.Arc need changing?!?!?
 
         else:
             # Check if this Gerber type is implemented
@@ -234,6 +240,8 @@ def gerber_rotate_90(self):
             if len(stmt.modifiers[0]) > 1:
                 stmt.modifiers[0] = (stmt.modifiers[0][1], stmt.modifiers[0][0])
 
+        #TODO: does start and end angle of gerber.primitives.Arc need rotating?!?
+
 
     # Step1b: for .primitives
     for ind, primitive in enumerate(self.primitives):
@@ -252,9 +260,9 @@ def gerber_rotate_90(self):
                     # Assuming all primitives inside Region object is line
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
-
         elif type(primitive) == gerber.primitives.Arc:
-            raise NotImplementedError("\nI need to implement Arc\n")
+            self.primitives[ind].center = rotate_point(primitive.center, 90)
+            #TODO: does start and end angle of gerber.primitives.Arc need rotating?!?
 
         else:
             # Check if this Gerber type is implemented
@@ -341,7 +349,38 @@ class GerberToShapely:
         '''
 
         '''
-        raise NotImplementedError("Arc primitive gerber object convertion to Shapely method still not implemented")
+        ### Step1: Extracting Arc information from gerber object
+        center = object_to_convert.center  # Center of the arc
+        radius = object_to_convert.radius  # Radius to the middle of the thickness
+        thickness = object_to_convert.aperture.diameter  # Thickness of the arc
+        start_angle = math.degrees(object_to_convert.start_angle)  # Start angle in degrees
+        end_angle = math.degrees(object_to_convert.end_angle) # End angle in degrees
+        clockwise = False if object_to_convert.direction == 'counterclockwise' else True # Direction of the arc
+        num_points = 50  # the resolution of the arc
+
+        ### Step2: Creating a shapely Polygon Object
+        if clockwise:
+            angles = np.linspace(np.radians(start_angle), np.radians(end_angle), num=num_points)
+        else:
+            angles = np.linspace(np.radians(end_angle), np.radians(start_angle), num=num_points)
+        
+        # Step 2a: Calculate outer arc points
+        outer_radius = radius + thickness / 2
+        outer_arc_x = center[0] + outer_radius * np.cos(angles)
+        outer_arc_y = center[1] + outer_radius * np.sin(angles)
+        outer_arc_points = np.vstack((outer_arc_x, outer_arc_y)).T
+        
+        # Step 2b: Calculate inner arc points
+        inner_radius = radius - thickness / 2
+        inner_arc_x = center[0] + inner_radius * np.cos(angles[::-1])  # Reverse angles for inner arc
+        inner_arc_y = center[1] + inner_radius * np.sin(angles[::-1])
+        inner_arc_points = np.vstack((inner_arc_x, inner_arc_y)).T
+        
+        # Step 2c: Combine points to form a polygon
+        polygon_points = np.vstack((outer_arc_points, inner_arc_points))
+        polygon = Polygon(polygon_points)
+
+        return polygon
     
     @classmethod
     def to_chamfer_rectangle(cls, object_to_convert: gerber.primitives.Primitive) -> Polygon:
@@ -654,9 +693,10 @@ def visualize_group(group, gbr_obj=None):
     # Calculating Multiplier
     # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
     # multiplier /= 2
-    multiplier = 5
+    multiplier = 50
 
     len_group = len(group)
+    num = 0  # if only one object in the group
     for num, sth in enumerate(group[:-1]):
         print(f"Visualizaing Trace number: {num+1} out of {len_group}")
         visualize(sth, x_offset=x_center, y_offset=y_center, multiplier=multiplier)
