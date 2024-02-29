@@ -75,34 +75,7 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
 
     # Step 1b: Changing the primitive attribute
     for ind, primitive in enumerate(self.primitives):
-
-        if type(primitive) == gerber.primitives.Line:
-            self.primitives[ind].start = (primitive.start[0] + x_offset, primitive.start[1] + y_offset)
-            self.primitives[ind].end = (primitive.end[0] + x_offset, primitive.end[1] + y_offset)
-
-        elif type(primitive) == gerber.primitives.Region:
-            for ind2, region_primitive in enumerate(primitive.primitives):
-                if type(region_primitive) == gerber.primitives.Line:
-                    self.primitives[ind].primitives[ind2].start = (region_primitive.start[0] + x_offset, region_primitive.start[1] + y_offset)
-                    self.primitives[ind].primitives[ind2].end = (region_primitive.end[0] + x_offset, region_primitive.end[1] + y_offset)
-
-                else:
-                    # Assuming all primitives inside Region object is line
-                    raise NotImplementedError(f"I thought all primitives inside a Region object is Line primitives only, found {type(primitive)}")
-
-        elif type(primitive) == gerber.primitives.Arc:
-            self.primitives[ind].center = (primitive.center[0] + x_offset, primitive.center[1] + y_offset)
-
-        else:
-            # Check if this Gerber type is implemented
-            try:
-                tmp = GerberToShapely(primitive)
-            except NotImplementedError:
-                print(f"\nThis Gerber Object {type(primitive)} isn't implemented how to recenter!\n\n")
-                raise
-
-            self.primitives[ind].position = (primitive.position[0] + x_offset, primitive.position[1] + y_offset)
-
+        primitive.offset(x_offset, y_offset)
 
 gerber.rs274x.GerberFile.recenter_gerber_file = recenter_gerber_file
 
@@ -355,10 +328,14 @@ class GerberToShapely:
         '''
         ### Step1: Extracting Arc information from gerber object
         center = object_to_convert.center  # Center of the arc
+        print(center)
         radius = object_to_convert.radius  # Radius to the middle of the thickness
+        print(radius)
         thickness = object_to_convert.aperture.diameter  # Thickness of the arc
+        print(thickness)
         start_angle = object_to_convert.start_angle  # Start angle in degrees
         end_angle = object_to_convert.end_angle # End angle in degrees
+        print(start_angle, end_angle)
         clockwise = False if object_to_convert.direction == 'counterclockwise' else True # Direction of the arc
         num_points = 50  # the resolution of the arc
 
@@ -799,8 +776,7 @@ def visualize_group(group, gbr_obj=None):
     # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
     # multiplier /= 2
     # multiplier = 50
-    # multiplier = 20
-    multiplier = 5
+    multiplier = 20
 
     len_group = len(group)
     num = 0  # if only one object in the group
@@ -871,8 +847,6 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     coord_list_list.extend(tmp)
 
     if debug:
-        for coord_list in coord_list_list:
-            print(coord_list)
         visualize_group(coord_list_list, gbr_obj=gerber_obj)
 
     return coord_list_list
