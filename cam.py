@@ -334,6 +334,10 @@ class GerberToShapely:
         '''
         AMGroup stands for Apt Macro Group, it's made of a list of Outline objects and other shapes like Circle or Obround
         '''
+        ### DETECTING ROUND RECT AMGroup CORNERCASE
+        if object_to_convert.stmt.name == 'RoundRect':
+            return GerberToShapely.to_round_rectangle(object_to_convert)
+
         polygon_list = []
         for shape in object_to_convert.primitives:
             polygon_list.append(GerberToShapely(shape))
@@ -353,31 +357,39 @@ class GerberToShapely:
         center = object_to_convert.center  # Center of the arc
         radius = object_to_convert.radius  # Radius to the middle of the thickness
         thickness = object_to_convert.aperture.diameter  # Thickness of the arc
-        start_angle = math.degrees(object_to_convert.start_angle)  # Start angle in degrees
-        end_angle = math.degrees(object_to_convert.end_angle) # End angle in degrees
+        start_angle = object_to_convert.start_angle  # Start angle in degrees
+        end_angle = object_to_convert.end_angle # End angle in degrees
         clockwise = False if object_to_convert.direction == 'counterclockwise' else True # Direction of the arc
         num_points = 50  # the resolution of the arc
 
-        ### Step2: Creating a shapely Polygon Object
         if clockwise:
-            angles = np.linspace(np.radians(start_angle), np.radians(end_angle), num=num_points)
+            if start_angle > end_angle:
+                pass
+            else:
+                pass
+            raise NotImplementedError("")
+
         else:
-            angles = np.linspace(np.radians(end_angle), np.radians(start_angle), num=num_points)
+            if start_angle < end_angle:
+                angle_offset = 0
+            else:
+                angle_offset = math.pi
+
+        ### Step2: Creating a shapely Polygon Object
+        radius_in = radius - thickness/2
+        arc_coords_in = [ (center[0] + radius_in * np.cos(angle+angle_offset), center[1] + radius_in * np.sin(angle+angle_offset)) for angle in np.linspace(start_angle, end_angle, num_points)]
+
+        radius_out = radius + thickness/2
+        arc_coords_out = [ (center[0] + radius_out * np.cos(angle+angle_offset), center[1] + radius_out * np.sin(angle+angle_offset)) for angle in np.linspace(start_angle, end_angle, num_points)]
+
+        if clockwise:
+            arc_coords_out = arc_coords_out[::-1]
+        else:
+            arc_coords_in = arc_coords_in[::-1]
         
-        # Step 2a: Calculate outer arc points
-        outer_radius = radius + thickness / 2
-        outer_arc_x = center[0] + outer_radius * np.cos(angles)
-        outer_arc_y = center[1] + outer_radius * np.sin(angles)
-        outer_arc_points = np.vstack((outer_arc_x, outer_arc_y)).T
-        
-        # Step 2b: Calculate inner arc points
-        inner_radius = radius - thickness / 2
-        inner_arc_x = center[0] + inner_radius * np.cos(angles[::-1])  # Reverse angles for inner arc
-        inner_arc_y = center[1] + inner_radius * np.sin(angles[::-1])
-        inner_arc_points = np.vstack((inner_arc_x, inner_arc_y)).T
-        
-        # Step 2c: Combine points to form a polygon
-        polygon_points = np.vstack((outer_arc_points, inner_arc_points))
+        polygon_points = arc_coords_in
+        polygon_points.extend(arc_coords_out)
+
         polygon = Polygon(polygon_points)
 
         return polygon
@@ -510,10 +522,10 @@ class GerberToShapely:
         # checking my theory that outline only contains Line
         for shape in object_to_convert.primitives:
             if type(shape) != gerber.primitives.Line:
-                raise ValueError("I thought Outline only contains Line object ;(")
+                raise NotImplementedError("I thought Outline only contains Line object ;(")
 
             if shape.aperture.diameter != 0:
-                raise ValueError("I thought outline gerber.primitives.Line objects don't have a thickness ;(")
+                raise NotImplementedError("I thought outline gerber.primitives.Line objects don't have a thickness ;(")
 
         coord_list = []
         for line in object_to_convert.primitives:
@@ -567,7 +579,6 @@ class GerberToShapely:
 
         return Polygon(LineString(coord_list))
 
-
     @classmethod
     def to_round_butterfly(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
         '''
@@ -580,7 +591,101 @@ class GerberToShapely:
         '''
 
         '''
-        raise NotImplementedError("RoundRectangle primitive gerber object convertion to Shapely method still not implemented")
+        if type(object_to_convert) == gerber.rs274x.AMGroup and object_to_convert.stmt.name == 'RoundRect':
+            
+            ### Step 1: assuming the .primitives of this stupid AMGroup is Outline and Circle, now extracting all lines and the diameter of the 
+            lines = []
+            corner_diameter = -1
+            for primitive in object_to_convert.primitives:
+                if type(primitive) == gerber.rs274x.Outline:
+                    for l in primitive.primitives:
+
+                        if type(l) != gerber.primitives.Line:
+                            raise NotImplementedError("I thought Outline only contains Line object ;(")
+
+                        if l.aperture.diameter != 0:
+                            raise NotImplementedError("I thought outline gerber.primitives.Line objects don't have a thickness ;(")
+
+                        lines.append(GerberToShapely(l))
+
+                elif type(primitive) == gerber.rs274x.Circle:
+                    corner_diameter = primitive.diameter
+
+                else:
+                    raise NotImplementedError("I thought AMGroup Object named 'RoundRect' in .stmt will only have primitive Outline and Cirle in their primitives list")
+            else:
+                if corner_diameter == -1:
+                    raise NotImplementedError("didn't find any Circle objects in this AMGroup named 'RoundRect' in .stmt, thus don't know the diameter of the corners!")
+
+            ### Step 2: find which of the lines represent the height and which represent the width
+            def is_height(line):
+                return line.coords[0][0] == line.coords[1][0]
+
+            def is_width(line):
+                return line.coords[0][1] == line.coords[1][1]
+
+            heights = []
+            widths = []
+            for line in lines:
+                if is_height(line) and not is_width(line):
+                    heights.append(line.length)
+                if not is_height(line) and is_width(line):
+                    widths.append(line.length)
+
+            #TODO: now that I have extracted the height lines and width lines, I DON'T KNOW which line is the correct width/height
+            # for now I just choose the biggest number ;/
+            height = max(heights)
+            width = max(widths)
+
+            center = object_to_convert.position
+
+            ### Step 3: now that I have the height, width and rounded corner I can construct the rounded rectangle object easily
+            # Ensure the corner radius is not greater than half the width or height
+            corner_radius = min((corner_diameter/2), width / 2, height / 2)
+
+            # Create the corner arcs
+            # Each corner arc is defined by a sequence of points
+            def generate_arc(corner_radius, start_angle, end_angle, center=(0, 0), num_points=10):
+                """Generate points for an arc centered at a specified point."""
+                return [
+                    (center[0] + corner_radius * np.cos(angle), center[1] + corner_radius * np.sin(angle))
+                    for angle in np.linspace(start_angle, end_angle, num_points)
+                    ][::-1]
+            
+            # Calculate corner centers
+            top_left = (center[0] - width / 2 + corner_radius, center[1] + height / 2 - corner_radius)
+            top_right = (center[0] + width / 2 - corner_radius, center[1] + height / 2 - corner_radius)
+            bottom_right = (center[0] + width / 2 - corner_radius, center[1] - height / 2 + corner_radius)
+            bottom_left = (center[0] - width / 2 + corner_radius, center[1] - height / 2 + corner_radius)
+    
+            # Generate the arcs for the four corners
+            arcs = [
+                generate_arc(corner_radius, np.pi/2, np.pi, top_left),  # Top-left corner
+                generate_arc(corner_radius, 0, np.pi/2, top_right),  # Top-right corner
+                generate_arc(corner_radius, 3*np.pi/2, 2*np.pi, bottom_right),  # Bottom-right corner
+                generate_arc(corner_radius, np.pi, 3*np.pi/2, bottom_left)  # Bottom-left corner
+            ]
+
+            
+            # Create straight lines between the arcs
+            lines = [
+                    [arcs[0][-1], arcs[1][0]],
+                    [arcs[1][-1], arcs[2][0]],
+                    [arcs[2][-1], arcs[3][0]],
+                    [arcs[3][-1], arcs[0][0]]
+                ]
+           
+            # Combine arcs and lines into a single sequence of points
+            exterior_points = []
+            for i in range(4):
+                exterior_points.extend(arcs[i])
+                exterior_points.extend(lines[i])
+            
+            # Create and return the polygon
+            return Polygon(exterior_points)
+
+        else:
+            raise NotImplementedError("still didn't implement a gerber round rect object only an AMGroup named RoundRect in .stmt")
 
     @classmethod
     def to_slot(cls, object_to_convert: gerber.primitives.Primitive) -> LinearRing:
@@ -693,7 +798,9 @@ def visualize_group(group, gbr_obj=None):
     # Calculating Multiplier
     # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
     # multiplier /= 2
-    multiplier = 50
+    # multiplier = 50
+    # multiplier = 20
+    multiplier = 5
 
     len_group = len(group)
     num = 0  # if only one object in the group
@@ -764,6 +871,8 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     coord_list_list.extend(tmp)
 
     if debug:
+        for coord_list in coord_list_list:
+            print(coord_list)
         visualize_group(coord_list_list, gbr_obj=gerber_obj)
 
     return coord_list_list
