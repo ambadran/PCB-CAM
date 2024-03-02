@@ -74,7 +74,7 @@ def recenter_gerber_file(self, x_offset: int, y_offset: int) -> None:
         stmt.offset(x_offset, y_offset)
 
     # Step 1b: Changing the primitive attribute
-    for ind, primitive in enumerate(self.primitives):
+    for primitive in self.primitives:
         primitive.offset(x_offset, y_offset)
 
 gerber.rs274x.GerberFile.recenter_gerber_file = recenter_gerber_file
@@ -136,18 +136,19 @@ def gerber_mirror(self, x_y_axis: bool = True) -> None:
 
         elif type(primitive) == gerber.primitives.Arc:
             if x_y_axis:
-                self.primitives[ind].center = (primitive.center[0]*-1, primitive.center[1])
+                # self.primitives[ind].center = (primitive.center[0]*-1, primitive.center[1])
+                primitive.offset(-primitive.center[0]+primitive.center[0]*-1, 0)
 
             else:
-                self.primitives[ind].center = (primitive.center[0], primitive.center[1]*-1)
-            #TODO: does start and end angle of gerber.primitives.Arc need changing?!?!?
+                # self.primitives[ind].center = (primitive.center[0], primitive.center[1]*-1)
+                primitive.offset(0, -primitive.center[1]+primitive.center[1]*-1)
 
         else:
             # Check if this Gerber type is implemented
             try:
                 tmp = GerberToShapely(primitive)
             except NotImplementedError:
-                print(f"\nThis Gerber Object {type(primitive)} isn't implemented how to recenter!\n\n")
+                print(f"\nThis Gerber Object {type(primitive)} isn't implemented! \n\n")
                 raise
 
             if x_y_axis:
@@ -234,8 +235,8 @@ def gerber_rotate_90(self):
                     raise NotImplementedError("I thought all primitives inside a Region object is Line primitives only")
 
         elif type(primitive) == gerber.primitives.Arc:
-            self.primitives[ind].center = rotate_point(primitive.center, 90)
-            #TODO: does start and end angle of gerber.primitives.Arc need rotating?!?
+            offset = rotate_point(primitive.center, 90)
+            primitive.offset(-primitive.center[0]+offset[0], -primitive.center[1]+offset[1])
 
         else:
             # Check if this Gerber type is implemented
