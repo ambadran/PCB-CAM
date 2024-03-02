@@ -219,7 +219,6 @@ def gerber_rotate_90(self):
 
     # Step1b: for .primitives
     for ind, primitive in enumerate(self.primitives):
-
         if type(primitive) == gerber.primitives.Line:
             self.primitives[ind].start = rotate_point(primitive.start, 90)
             self.primitives[ind].end = rotate_point(primitive.end, 90)
@@ -237,6 +236,30 @@ def gerber_rotate_90(self):
         elif type(primitive) == gerber.primitives.Arc:
             offset = rotate_point(primitive.center, 90)
             primitive.offset(-primitive.center[0]+offset[0], -primitive.center[1]+offset[1])
+
+        elif type(primitive) == gerber.primitives.AMGroup and primitive.stmt.name == 'RoundRect':
+
+            self.primitives[ind].position = rotate_point(primitive.position, 90)
+
+            for ind2, sub_primitive in enumerate(primitive.primitives):
+                if type(sub_primitive) == gerber.rs274x.Outline:
+                    for ind3, l in enumerate(sub_primitive.primitives):
+
+                        if type(l) != gerber.primitives.Line:
+                            raise NotImplementedError("I thought Outline only contains Line object ;(")
+
+                        if l.aperture.diameter != 0:
+                            raise NotImplementedError("I thought outline gerber.primitives.Line objects don't have a thickness ;(")
+
+                        self.primitives[ind].primitives[ind2].primitives[ind3].start = rotate_point(l.start, 90)
+                        self.primitives[ind].primitives[ind2].primitives[ind3].end = rotate_point(l.end, 90)
+
+                elif type(sub_primitive) == gerber.rs274x.Circle:
+                    self.primitives[ind].primitives[ind2].position = rotate_point(sub_primitive.position, 90)
+
+                else:
+                    raise NotImplementedError(f"I thought AMGroup Object named 'RoundRect' in .stmt will only have primitive Outline and Cirle in their primitives list, found {primitive}")
+
 
         else:
             # Check if this Gerber type is implemented
@@ -329,14 +352,10 @@ class GerberToShapely:
         '''
         ### Step1: Extracting Arc information from gerber object
         center = object_to_convert.center  # Center of the arc
-        print(center)
         radius = object_to_convert.radius  # Radius to the middle of the thickness
-        print(radius)
         thickness = object_to_convert.aperture.diameter  # Thickness of the arc
-        print(thickness)
         start_angle = object_to_convert.start_angle  # Start angle in degrees
         end_angle = object_to_convert.end_angle # End angle in degrees
-        print(start_angle, end_angle)
         clockwise = False if object_to_convert.direction == 'counterclockwise' else True # Direction of the arc
         num_points = 50  # the resolution of the arc
 
@@ -596,12 +615,8 @@ class GerberToShapely:
                     raise NotImplementedError("didn't find any Circle objects in this AMGroup named 'RoundRect' in .stmt, thus don't know the diameter of the corners!")
 
             ### Step 2: find which of the lines represent the height and which represent the width
-            def is_height(line):
-                return line.coords[0][0] == line.coords[1][0]
-
-            def is_width(line):
-                return line.coords[0][1] == line.coords[1][1]
-
+            is_height = lambda line: line.coords[0][0] == line.coords[1][0]
+            is_width = lambda line: line.coords[0][1] == line.coords[1][1]
             heights = []
             widths = []
             for line in lines:
