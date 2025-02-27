@@ -1,9 +1,8 @@
 # PCB-CAM
 
-This is my 2nd implmentation of a custom PCB CAM software for my PCB-Manufacturer Project https://github.com/ambadran/PCB-Manufacturer
+This is a Python program that takes in Gerber files and outputs Gcode files to manufacture the PCB using laser or spindle engraving.
 
-The first implementation was a do-everything-from-scratch approach :)
+It also supports simulating the tool path easily.
+It can also generate drilling Gcode, and PCB cutting Gcode.
 
-However, this meant that with every pcb I discovered new corner cases I needed to implement.
-
-This time, I'll be using shapely python library, which should handle all the possible trace shapes for me.
+(This is my 2nd implmentation of a custom PCB CAM software for my PCB-Manufacturer Project https://github.com/ambadran/PCB-Manufacturer)
