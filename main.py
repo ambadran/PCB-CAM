@@ -4,7 +4,12 @@ PCB manufacturer CAM program
 
 My custom Gcode Generator :)))
 '''
-import gerber
+import warnings
+with warnings.catch_warnings():
+    # suppressing a stupid syntax warning to convert 'is not' to '!='
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
+    import gerber
+
 from gcode_tools import *
 import default_settings
 import os
@@ -158,8 +163,15 @@ if __name__ == '__main__':
         'all_gcode': False,
         'ink': False,
         'laser': True,
-        'holes': True 
+        'holes': True,
 
+        # Show Gcode Creation Debugging info and visualization :)
+        'debug': True,
+
+        # other options
+
+        'dont_export_gbr': False,  # saves the gbr file after recenter and mirror (if settings allow it)
+        'new_gbr_name': 'mirrored_and_offseted.gbr'
     }
 
     ### Settings

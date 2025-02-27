@@ -3,7 +3,13 @@ This script uses python gerber library to read and parse any gerber file.
 Then uses shapely to create outline gcode and holes gcode.
 '''
 from __future__ import annotations
-import gerber
+
+import warnings
+with warnings.catch_warnings():
+    # suppressing a stupid syntax warning to convert 'is not' to '!='
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
+    import gerber
+
 try:
     from shapely import Point, MultiPoint, LineString, LinearRing, box, Polygon
 except ImportError:
@@ -354,6 +360,7 @@ class GerberToShapely:
         center = object_to_convert.center  # Center of the arc
         radius = object_to_convert.radius  # Radius to the middle of the thickness
         thickness = object_to_convert.aperture.diameter  # Thickness of the arc
+
         start_angle = object_to_convert.start_angle  # Start angle in degrees
         end_angle = object_to_convert.end_angle # End angle in degrees
         clockwise = False if object_to_convert.direction == 'counterclockwise' else True # Direction of the arc
@@ -529,6 +536,7 @@ class GerberToShapely:
             coord_list.append(line.start)
             coord_list.append(line.end)
 
+
         return Polygon(LinearRing(coord_list))
 
     @classmethod
@@ -561,6 +569,7 @@ class GerberToShapely:
 
         for ind, region_primitive in enumerate(object_to_convert.primitives[1:]):
             if type(region_primitive) == gerber.primitives.Line:
+
 
                 # Checking for discontiniouty errors
                 prev_region_primitive = object_to_convert.primitives[ind]
@@ -672,6 +681,7 @@ class GerberToShapely:
             exterior_points = []
             for i in range(4):
                 exterior_points.extend(arcs[i])
+
                 exterior_points.extend(lines[i])
             
             # Create and return the polygon

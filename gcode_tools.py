@@ -4,7 +4,14 @@ This file has function to generate the gcode we want
 from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
-from cam import get_laser_coords, get_holes_coords, get_pen_coords, Point, gerber
+
+import warnings
+with warnings.catch_warnings():
+    # suppressing a stupid syntax warning to convert 'is not' to '!='
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
+    import gerber
+
+from cam import get_laser_coords, get_holes_coords, get_pen_coords, Point
 
 def get_max_decimal_place(value: float) -> int:
     '''
@@ -608,12 +615,10 @@ if __name__ == '__main__':
 
     #NOTE!!!! The gerber file is assumed to be mirrorred!!!!!
 
-    gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
-    # gerber_file_path = 'gerber_files/test2.gbr'
+    gerber_file_path = 'gerber_files/test2.gbr'
     # gerber_file_path = 'gerber_files/test.gbr'
 
-    # gcode_file_path = 'gcode_files/default.gcode'
-    gcode_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/mirrored_and_offseted.gbr'
+    gcode_file_path = 'gcode_files/default.gcode'
 
     # new_file_name = 'test2.gbr'
 

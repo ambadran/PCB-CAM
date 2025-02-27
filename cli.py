@@ -56,13 +56,13 @@ if __name__ == '__main__':
     ### Adding keyword Arguments
     addArg('dest', "Destination Gcode file", str, 'D')
 
-    addArg('mirrored', "Mirror Given Srouce Gerber file. Used for traces of DIP components", bool, 'M')
-    addArg('rotated', "Rotate 90degrees Given Srouce Gerber file. Used for traces of DIP components", bool, 'R')
+    addArg('mirrored', "Mirror Gerber file. (All coordinates are mirrored)", bool, 'M')
+    addArg('rotated', "Rotate Gerber file 90 degrees. (All coordinates are rotated 90d)", bool, 'R')
 
     addArg('x_offset', "Value PCB offseted from X axis", int)
     addArg('y_offset', "Value PCB offseted from Y axis", int)
 
-    addArg('all_gcode', "Creates a Gcode file with hole drilling gcode, ink laying gcode and laser drawing gcode", bool, 'ALL')
+    addArg('all_gcode', "Creates a Gcode file with hole drilling gcode, ink laying gcode and laser engraving gcode", bool, 'ALL')
     addArg('holes', "Adds hole drilling gcode to Gcode file", bool)
     addArg('ink', "Adds ink laying gcode to Gcode file", bool)
     addArg('laser', "Adds laser drawing gcode to Gcode file", bool)
