@@ -792,7 +792,7 @@ def visualize_group(group, gbr_obj=None):
     # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
     # multiplier /= 2
     # multiplier = 50
-    multiplier = 20
+    multiplier = 5
 
     len_group = len(group)
     num = 0  # if only one object in the group
