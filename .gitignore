@@ -4,6 +4,7 @@ build/
 refrences/
 *.vim
 *.gcode
+*.gbr
 .DS_Store/
 ._.DS_Store
 .DS_Store
@@ -22,3 +23,4 @@ __pychache__
 *_autosave*
 *.~*
 ~$*
+test/
