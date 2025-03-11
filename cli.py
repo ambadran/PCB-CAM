@@ -54,24 +54,32 @@ if __name__ == '__main__':
     parser.add_argument('src', help="Source Gerber file to be converted to Gcode\n")
 
     ### Adding keyword Arguments
+    # File management settings
     addArg('dest', "Destination Gcode file", str, 'D')
+    addArg('dont_export_gbr', "Doesn't allow exporting of the mirrored_and_offseted gerber file", bool)
+    addArg('new_gbr_name', "The name of the newly created Gerber File after mirroring and offsetting", str)
 
+    # Gerber file modifications settings
     addArg('mirrored', "Mirror Gerber file. (All coordinates are mirrored)", bool, 'M')
     addArg('rotated', "Rotate Gerber file 90 degrees. (All coordinates are rotated 90d)", bool, 'R')
-
     addArg('x_offset', "Value PCB offseted from X axis", int)
     addArg('y_offset', "Value PCB offseted from Y axis", int)
 
-    addArg('all_gcode', "Creates a Gcode file with hole drilling gcode, ink laying gcode and laser engraving gcode", bool, 'ALL')
+    # Type of PCB related operations to include in Gcode
     addArg('holes', "Adds hole drilling gcode to Gcode file", bool)
-    addArg('ink', "Adds ink laying gcode to Gcode file", bool)
-    addArg('laser', "Adds laser drawing gcode to Gcode file", bool)
+    # addArg('ink', "Adds ink laying gcode to Gcode file", bool)  # deprecated
+    addArg('laser', "Adds laser engraving gcode to Gcode file", bool)
+    addArg('spindle', "Adds spindle engraving gcode to Gcode file", bool)
+
+    # Tool Head change ( kinematic mounting mechanisms / spindle bit change )
+    addArg('spindle_bit_change', "Adds support for CNC machines with the ability to change spindle bits.\n(Please note that the id of bit, type and size must be defined in the default_settings file or added as an argument here.)", bool)
+    addArg('kinematic_mounting_mechanism', "Adds support for CNC machines with the ability to change tool head altogether using kinematic mounting mechanisms.\n(Please note that the id of the specific tool head, home position, tool offset coords MUST be defined in the default_settings file or added as an argument here.)", bool)
+
+    # Extra settings for a specific operation
     addArg('include_edge_cuts', "Include Edge cuts in laser marking process", bool)
     addArg('laser_passes', "Number of passes for laser marking Gcode", int)
-    addArg('debug', "Shows Simulation of the PCB laser trace coordinates as well as other debug Info.", bool)
 
-    addArg('dont_export_gbr', "Doesn't allow exporting of the mirrored_and_offseted gerber file", bool)
-    addArg('new_gbr_name', "The name of the newly created Gerber File after mirroring and offsetting", str)
+    addArg('debug', "Shows Simulation of the PCB laser trace coordinates as well as other debug Info.", bool)
 
     ### Extracting User inputs!
     # Getting arguments

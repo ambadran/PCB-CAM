@@ -6,7 +6,15 @@ default_settings_dict = {
     "x_offset": 2,
     "y_offset": 2,
 
-    ### Tool Home positions and latch offset (as absolute values)
+    ### Tool change settings
+    'spindle_bit_change': False,
+    'kinematic_mounting_mechanism': False,
+
+    ### Spindle Bit Change Settings
+    #TODO:
+
+    ### Kinematic Mounting Mechanism settings
+    # Tool Home positions and latch offset (as absolute values)
     "X_latch_offset_distance_in": 188,  # ABSOLUTE value
     "X_latch_offset_distance_out": 92,  # ABSOLUTE value
     "attach_detach_time": 5, # the P attribute in Gcode is in seconds
@@ -47,7 +55,7 @@ default_settings_dict = {
     # Power intensities
     "laser_power": 200,
     # Include edge cut in pcb laser marking
-    "include_edge_cuts": True,
+    "include_edge_cuts": False,
     # Laser Gcode Passes
     "laser_passes": 1,
 
@@ -61,9 +69,9 @@ default_settings_dict = {
     'rotated': False,
 
     # Gcode Modes
-    'all_gcode': False,
-    'ink': False,
+    # 'ink': False, # deprecated
     'laser': False,
+    'spindle': False,
     'holes': False,
 
     # Show Gcode Creation Debugging info and visualization :)

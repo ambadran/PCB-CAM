@@ -393,7 +393,8 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     gcode += '\n; The following gcode is the PCB holes drill gcode\n\n'
 
     # Activiate Tool number 2, The Spindle
-    gcode += tool(ToolChange.Select, Tool.Spindle)
+    if tool:
+        gcode += tool(ToolChange.Select, Tool.Spindle) 
 
     # Setting XY movement feedrate
     gcode += f'F{feedrate_XY} ; setting default feedrate\n\n'
@@ -426,119 +427,120 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     gcode += f'M5 ; disabling spindle PWM\n\n'
 
     # Get the tool back to its place and deselect the tool
-    gcode += tool(ToolChange.Deselect, Tool.Spindle)
+    if tool:
+        gcode += tool(ToolChange.Deselect, Tool.Spindle)
 
     return gcode
 
+# Deprecated
+#def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, tip_thickness: float, pen_down_position: int, 
+#        feedrate: int, debug: bool=False) -> str:
+#    '''
+#    :param gerber: Gerber Object from the gerber library
+#    :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
+#    :param tip_thickness: number to convey thickness of pen tip in mm
+#    :param pen_down_position: position that pen touches PCB in Z axis
+#    :param feedrate: integer mm/minute, only for x and y movement for pen movement when drawing
 
-def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, tip_thickness: float, pen_down_position: int, 
-        feedrate: int, debug: bool=False) -> str:
-    '''
-    :param gerber: Gerber Object from the gerber library
-    :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
-    :param tip_thickness: number to convey thickness of pen tip in mm
-    :param pen_down_position: position that pen touches PCB in Z axis
-    :param feedrate: integer mm/minute, only for x and y movement for pen movement when drawing
+#    :return: This function creates the gcode content as string according to the input coordinates
+#    '''
+#    ### Working out the variables ###
+#    # Get min/max of PCB outline
 
-    :return: This function creates the gcode content as string according to the input coordinates
-    '''
-    ### Working out the variables ###
-    # Get min/max of PCB outline
-
-    #TODO: use the new python gerber library to return edge coordinates. 
-    #OLD CODE: edge_coordinates = gerber.coordinates[BlockType.Profile]
-    #NEW CODE: edge_coordinates = gerber.bounds #TODO: make the output of this python gerber the same as my old output
+#    #TODO: use the new python gerber library to return edge coordinates. 
+#    #OLD CODE: edge_coordinates = gerber.coordinates[BlockType.Profile]
+#    #NEW CODE: edge_coordinates = gerber.bounds #TODO: make the output of this python gerber the same as my old output
 
 
-    min_coord, max_coord = Point.get_min_max(edge_coordinates)
+#    min_coord, max_coord = Point.get_min_max(edge_coordinates)
 
-    # Finding num_ys and overlapping_distance
-    #NOTE: Detailed description of what i am doing here is in the iPad notes
-    y_length = round(max_coord.y - min_coord.y, 2)
+#    # Finding num_ys and overlapping_distance
+#    #NOTE: Detailed description of what i am doing here is in the iPad notes
+#    y_length = round(max_coord.y - min_coord.y, 2)
 
-    OD_min_value = 1
-    OD_max_value = tip_thickness - 1
+#    OD_min_value = 1
+#    OD_max_value = tip_thickness - 1
 
-    num_ys_max_value = floor( ( y_length ) / (tip_thickness - OD_max_value) )
-    num_ys_min_value = ceil( ( y_length ) / (tip_thickness - OD_min_value) )
+#    num_ys_max_value = floor( ( y_length ) / (tip_thickness - OD_max_value) )
+#    num_ys_min_value = ceil( ( y_length ) / (tip_thickness - OD_min_value) )
     
 
-    results = {}  # key is num_ys and value is overlapping_distance
-    for num_ys in range(num_ys_min_value, num_ys_max_value+1):
-        # Equation to find overlapping_distance according to given inputs, mainly the num_ys
-        overlapping_distance_unrounded = (tip_thickness+num_ys*tip_thickness-y_length) / (num_ys + 2)
-        overlapping_distance = round(overlapping_distance_unrounded, 2)
-        results[num_ys] = overlapping_distance
+#    results = {}  # key is num_ys and value is overlapping_distance
+#    for num_ys in range(num_ys_min_value, num_ys_max_value+1):
+#        # Equation to find overlapping_distance according to given inputs, mainly the num_ys
+#        overlapping_distance_unrounded = (tip_thickness+num_ys*tip_thickness-y_length) / (num_ys + 2)
+#        overlapping_distance = round(overlapping_distance_unrounded, 2)
+#        results[num_ys] = overlapping_distance
 
-    num_ys = list(results.keys())[0]  # Choosing the value with least amount of num_ys
-    overlapping_distance = list(results.values())[0]  # Choosing the value with least amount of num_ys
+#    num_ys = list(results.keys())[0]  # Choosing the value with least amount of num_ys
+#    overlapping_distance = list(results.values())[0]  # Choosing the value with least amount of num_ys
     
-    # Finding the rest of the values
-    x_start_pos = min_coord.x + 0.5*tip_thickness - overlapping_distance
-    x_end_pos = max_coord.x - 0.5*tip_thickness + overlapping_distance
-    y_start_pos = min_coord.y + 0.5*tip_thickness - overlapping_distance
+#    # Finding the rest of the values
+#    x_start_pos = min_coord.x + 0.5*tip_thickness - overlapping_distance
+#    x_end_pos = max_coord.x - 0.5*tip_thickness + overlapping_distance
+#    y_start_pos = min_coord.y + 0.5*tip_thickness - overlapping_distance
 
-    y_increment = tip_thickness - overlapping_distance
+#    y_increment = tip_thickness - overlapping_distance
 
-    debug_mode = False
-    if debug_mode:
-        print()
-        print('### Debug Values for ink laying gcode generator Function ###')
-        print(x_min_max, y_min_max, ': board outline')
-        print(y_length, tip_thickness, ': y-length and tip thickness')
-        print(OD_min_value, OD_max_value, ': OD limits')
-        print(num_ys_max_value, num_ys_min_value, ': ys limits')
-        print(results)
-        print(num_ys, overlapping_distance)
-        print(x_start_pos, y_start_pos, ': start positions')
-        print(x_end_pos, ': end positions')
-        print(y_increment, ': y increment')
-        print('### End ###')
-        print()
-        print()
+#    debug_mode = False
+#    if debug_mode:
+#        print()
+#        print('### Debug Values for ink laying gcode generator Function ###')
+#        print(x_min_max, y_min_max, ': board outline')
+#        print(y_length, tip_thickness, ': y-length and tip thickness')
+#        print(OD_min_value, OD_max_value, ': OD limits')
+#        print(num_ys_max_value, num_ys_min_value, ': ys limits')
+#        print(results)
+#        print(num_ys, overlapping_distance)
+#        print(x_start_pos, y_start_pos, ': start positions')
+#        print(x_end_pos, ': end positions')
+#        print(y_increment, ': y increment')
+#        print('### End ###')
+#        print()
+#        print()
 
 
-    ### G-Code to be generated ###
-    gcode = ''
+#    ### G-Code to be generated ###
+#    gcode = ''
 
-    gcode += '\n; The following gcode is the ink laying gcode\n'
-    gcode += f'; According to input gerber file it will have {num_ys} number of y iterations and Over-lapping distance is {overlapping_distance}\n\n'
+#    gcode += '\n; The following gcode is the ink laying gcode\n'
+#    gcode += f'; According to input gerber file it will have {num_ys} number of y iterations and Over-lapping distance is {overlapping_distance}\n\n'
 
-    # Select Tool number 3, The Pen
-    gcode += tool(ToolChange.Select, Tool.Pen)
+#    # Select Tool number 3, The Pen
+#    gcode += tool(ToolChange.Select, Tool.Pen)
 
-    # Activate Tool number 3, The Pen
-    # gcode += 'M3 S250 ; Turn Pen ON\n\n' #TODO:
+#    # Activate Tool number 3, The Pen
+#    # gcode += 'M3 S250 ; Turn Pen ON\n\n' #TODO:
 
-    # Set the slow feedrate to be used for ink laying
-    gcode += f'F{feedrate} ; setting default feedrate for ink laying\n\n'
+#    # Set the slow feedrate to be used for ink laying
+#    gcode += f'F{feedrate} ; setting default feedrate for ink laying\n\n'
 
-    # Go to starting position
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='; Go to ink laying starting position', x=x_start_pos, y=y_start_pos, z=pen_down_position)
+#    # Go to starting position
+#    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='; Go to ink laying starting position', x=x_start_pos, y=y_start_pos, z=pen_down_position)
 
-    # Execute the MAIN Gcode
-    current_x_dict = {False: x_start_pos, True: x_end_pos}
-    current_x_ind = False
-    current_y = y_start_pos  # must add the y start position before adding increments
-    for _ in range(num_ys):
-        current_x_ind = not current_x_ind
-        current_x = current_x_dict[current_x_ind]
-        current_y += y_increment
+#    # Execute the MAIN Gcode
+#    current_x_dict = {False: x_start_pos, True: x_end_pos}
+#    current_x_ind = False
+#    current_y = y_start_pos  # must add the y start position before adding increments
+#    for _ in range(num_ys):
+#        current_x_ind = not current_x_ind
+#        current_x = current_x_dict[current_x_ind]
+#        current_y += y_increment
 
-        gcode += move(CoordMode.ABSOLUTE, x=current_x)
-        gcode += move(CoordMode.ABSOLUTE, y=current_y)
-    gcode += '\n'
+#        gcode += move(CoordMode.ABSOLUTE, x=current_x)
+#        gcode += move(CoordMode.ABSOLUTE, y=current_y)
+#    gcode += '\n'
 
-    # Get tool away from PCB in Z position
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Get away from PCB in Z axis\n', z=0)
+#    # Get tool away from PCB in Z position
+#    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Get away from PCB in Z axis\n', z=0)
 
-    # Deactivate End Effector Signal
-    gcode += f'M5 ; Disable End-Effector Signal\n\n'
+#    # Deactivate End Effector Signal
+#    gcode += f'M5 ; Disable End-Effector Signal\n\n'
 
-    # Get the tool back and deselect it
-    gcode += tool(ToolChange.Deselect, Tool.Pen)
+#    # Get the tool back and deselect it
+#    gcode += tool(ToolChange.Deselect, Tool.Pen)
 
-    return gcode
+#    return gcode
 
 
 def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
@@ -558,8 +560,8 @@ def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callabl
     gcode += '\n; The following gcode is the PCB trace laser marking gcode\n\n'
 
     # Activiate Tool number 1, The Laser Module
-    gcode += f"M5 ; Being extra sure it won't light up before activation\n\n"
-    gcode += tool(ToolChange.Select, Tool.Laser)
+    if tool:
+        gcode += tool(ToolChange.Select, Tool.Laser)
     
     # Setting the laser module movment feedrate
     gcode += f'F{feedrate} ; setting default feedrate\n\n'
@@ -595,7 +597,8 @@ def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callabl
     gcode += f'M5 ; Disable End-Effector Signal\n\n'
 
     # Get the tool back and deselect it
-    gcode += tool(ToolChange.Deselect, Tool.Laser)
+    if tool:
+        gcode += tool(ToolChange.Deselect, Tool.Laser)
 
     return gcode
 

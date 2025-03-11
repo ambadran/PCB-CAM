@@ -1,6 +1,5 @@
 '''
-#TODO: The MOST IMPORTANT TASK NOW is to implement something to prevent choosing a tool when a tool is already mounted
-PCB manufacturer CAM program
+PCB CAM program 
 
 My custom Gcode Generator :)))
 '''
@@ -35,7 +34,19 @@ class Settings:
 
     @property
     def tool(self):
-        return get_tool_func(self.X_latch_offset_distance_in, self.X_latch_offset_distance_out, self.tool_home_coordinates, self.tool_offsets, self.attach_detach_time)
+        '''
+        This function prepares end effector for multi-tool CNC machines.
+        There are two types of multi-tool CNC machines
+
+        1- Uses Kinematic mounting mechanisms that  need the end effector to attach to a specific tool (laser engraver) then latch onto it and then pull out.
+        2- Uses Spindle bit change mechanisms.
+        '''
+        if self.kinematic_mounting_mechanism:
+            return get_tool_func(self.X_latch_offset_distance_in, self.X_latch_offset_distance_out, self.tool_home_coordinates, self.tool_offsets, self.attach_detach_time)
+
+        elif self.spindle_bit_change:
+            #TODO: need to re-write ALL the tool functions to accomodate all possibilites
+            pass
 
 
 def main(settings: Settings):
@@ -43,9 +54,10 @@ def main(settings: Settings):
     ### Main Code ###
     '''
     # Error checking the arguments
-    if not settings.all_gcode and not settings.holes and not settings.ink and not settings.laser:
+    if  not settings.holes and not settings.ink and not settings.laser and not settings.spindle:
         raise ValueError("\nMust choose what Gcode to export!\nOptions:\n1- '--all-gcode' : exports all 3 gcodes\n2- '--holes' : Adds hole drilling gcode to Gcode file\n3- '--ink' : Adds ink laying gcode to Gcode file\n4- '--laser' : Adds laser drawing gcode to Gcode file")
-
+    if settings.laser and settings.spindle:
+        raise ValueError("\nCan't have two engraving methods! Please either spindle OR laser.")
 
     ### Processing the Gerber file
     # Read the gerber file
@@ -75,21 +87,32 @@ def main(settings: Settings):
     # Machine Init
     gcode += general_machine_init()
 
-    # Creating the PCB ink laying Gcode
-    if settings.all_gcode or settings.ink:
-        gcode += generate_ink_laying_gcode(gerber_obj, settings.tool, settings.tip_thickness, 
-                                           settings.pen_down_position, settings.ink_laying_feedrate, debug=settings.debug)
-        debug_msg += "Exported Ink Laying Gcode..\n"
+    ### DEPRECATED ###
+    # # Creating the PCB ink laying Gcode
+    # if settings.all_gcode or settings.ink:
+    #     gcode += generate_ink_laying_gcode(gerber_obj, settings.tool, settings.tip_thickness, 
+    #                                        settings.pen_down_position, settings.ink_laying_feedrate, debug=settings.debug)
+    #     debug_msg += "Exported Ink Laying Gcode..\n"
+    ##################
 
-    # Creating the PCB trace laser Toner Transfer Gcode
-    if settings.all_gcode or settings.laser:
+    # Creating the PCB traces by spindle engraving
+    #TODO: add some way to set GRBL mode for laser or spindle operation
+    if settings.spindle:
         gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
                 settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
                 debug=settings.debug)
-        debug_msg += "Exported laser trace isolation Gcode..\n"
+        debug_msg += "Exported Spindle PCB engraving Gcode..\n"
+
+    # Creating the PCB traces by laser engraving
+    #TODO: add some way to set GRBL mode for laser or spindle operation
+    if  settings.laser:
+        gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
+                settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
+                debug=settings.debug)
+        debug_msg += "Exported laser PCB engraving Gcode..\n"
 
     # Creating the holes_gcode
-    if settings.all_gcode or settings.holes:
+    if settings.holes:
         gcode += generate_holes_gcode(gerber_obj, settings.tool, settings.router_Z_up_position, 
                                       settings.router_Z_down_position, settings.router_feedrate_XY, 
                                       settings.router_feedrate_Z_drilling, settings.router_feedrate_Z_up_from_pcb,
