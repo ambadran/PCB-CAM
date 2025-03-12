@@ -28,7 +28,6 @@ DEVICE_H = 1160 # 1600
 START_X = 0
 START_Y = 0
 
-
 DEFAULT_RESOLUTION = 5
 
 ############# Adding features to imported classes #############

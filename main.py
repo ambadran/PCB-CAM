@@ -98,7 +98,7 @@ def main(settings: Settings):
     # Creating the PCB traces by spindle engraving
     #TODO: add some way to set GRBL mode for laser or spindle operation
     if settings.spindle:
-        gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
+        gcode += generate_spindle_engraving_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
                 settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
                 debug=settings.debug)
         debug_msg += "Exported Spindle PCB engraving Gcode..\n"
@@ -106,7 +106,7 @@ def main(settings: Settings):
     # Creating the PCB traces by laser engraving
     #TODO: add some way to set GRBL mode for laser or spindle operation
     if  settings.laser:
-        gcode += generate_pcb_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
+        gcode += generate_laser_engraving_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
                 settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
                 debug=settings.debug)
         debug_msg += "Exported laser PCB engraving Gcode..\n"

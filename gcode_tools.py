@@ -432,7 +432,6 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
 
     return gcode
 
-# Deprecated
 #def generate_ink_laying_gcode(gerber: gerber.rs274x.GerberFile, tool: Callable, tip_thickness: float, pen_down_position: int, 
 #        feedrate: int, debug: bool=False) -> str:
 #    '''
@@ -543,7 +542,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
 #    return gcode
 
 
-def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
+def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
         feedrate: int, laser_power: int, include_edge_cuts: bool, laser_passes: int, debug: bool=False) -> str:
     '''
     :param gerber_file: the file that we want to get the holes coordinate from
@@ -558,6 +557,9 @@ def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callabl
     gcode = ''
 
     gcode += '\n; The following gcode is the PCB trace laser marking gcode\n\n'
+
+    # Setting GRBL mode to laser mode
+    gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
 
     # Activiate Tool number 1, The Laser Module
     if tool:
@@ -601,6 +603,69 @@ def generate_pcb_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callabl
         gcode += tool(ToolChange.Deselect, Tool.Laser)
 
     return gcode
+
+def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
+        feedrate: int, laser_power: int, include_edge_cuts: bool, laser_passes: int, debug: bool=False) -> str:
+    '''
+    :param gerber_file: the file that we want to get the holes coordinate from
+    :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
+    :param optimum_focal_distance: the distance at the laser is at its best focal distance
+    :param feedrate: integer mm/minute, only for x and y movement, z movement is hardcoded here
+    :param laser_power: laser intensity for toner transfer, please note that the value is 0-250, default value is 150 as tested.
+    :param passes: number of passes done by laser
+
+    :return: This function creates the gcode content as string according to the input coordinates
+    '''
+    gcode = ''
+
+    gcode += '\n; The following gcode is the PCB trace laser marking gcode\n\n'
+
+    # Setting GRBL mode to laser mode
+    gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
+
+    # Activiate Tool number 1, The Laser Module
+    if tool:
+        gcode += tool(ToolChange.Select, Tool.Laser)
+    
+    # Setting the laser module movment feedrate
+    gcode += f'F{feedrate} ; setting default feedrate\n\n'
+
+    # Setting the Optimum focal distance by moving the Z position in the correct coordinate
+    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Moving to correct focal length Z position\n', z=optimum_focal_distance)
+
+    # Setting the correct laser Power
+    gcode += f"S{laser_power} ; Setting Laser Power\n\n"
+
+    ### PCB trace laser marking Gcode
+    # Getting Offset Points for laser module to burn in 
+    # The bulk of the code is in this single line ;)
+    coordinate_lists = get_laser_coords(gerber_obj, include_edge_cuts, debug=debug)  
+
+    gcode += f"; Number of passes: {laser_passes}\n\n"
+    for pass_num in range(laser_passes):
+        gcode += f'; Pass number: {pass_num+1}\n'
+
+        for coordinate_list in coordinate_lists:
+            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
+            gcode += "M3\n"
+
+            for coordinate in coordinate_list[1:]:
+                gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate)
+
+            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])  #TODO: ??!??!?! what is this ???!?!
+            gcode += "M5\n"
+
+    gcode += '\n'
+
+    # Deactivate End Effector Signal
+    gcode += f'M5 ; Disable End-Effector Signal\n\n'
+
+    # Get the tool back and deselect it
+    if tool:
+        gcode += tool(ToolChange.Deselect, Tool.Laser)
+
+    return gcode
+
 
 
 def export_gcode(gcode: str, file_name: str) -> None:
@@ -651,7 +716,7 @@ if __name__ == '__main__':
     # Power intensities
     spindle_speed = 230
 
-    ### Pen Tweaking Values
+    ### Pen Tweaking Valuesgenerate_pcb_trace_gcode
     # Z positions
     pen_down_position = 10 
     # Feedrates
@@ -690,7 +755,7 @@ if __name__ == '__main__':
 #     gcode += generate_ink_laying_gcode(gerber_obj, tool, tip_thickness, pen_down_position, ink_laying_feedrate, initiated_before=True, terminate_after = False)
 
     # # Creating the PCB trace laser Toner Transfer Gcode
-    # gcode += generate_pcb_trace_gcode(gerber_obj, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
+    # gcode += generate_laser_engraving_trace_gcode(gerber_obj, tool, optimum_laser_Z_position, pcb_trace_feedrate, laser_power, debug=True)
 
     # # exporting the created Gcode
     # export_gcode(gcode, new_file_name)
