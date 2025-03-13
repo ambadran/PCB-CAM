@@ -274,7 +274,7 @@ def move(coordinate_mode: CoordMode, feedrate: Optional[int]=None, use_00: bool=
     gcode += '\n'
     
     if coordinate_mode == CoordMode.INCREMENTAL:
-        gcode += 'G21G90\n'
+        gcode += 'G21G90\n'  #get it back to absolute
 
     return gcode
 
@@ -556,10 +556,11 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, t
     '''
     gcode = ''
 
-    gcode += '\n; The following gcode is the PCB trace laser marking gcode\n\n'
+    gcode += '\n; PCB trace laser engraving Gcode\n\n'
 
     # Setting GRBL mode to laser mode
-    gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
+    #TODO: check first if it's not already set, Saving EEPROM with every run will wear it out with time
+    # gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
 
     # Activiate Tool number 1, The Laser Module
     if tool:
@@ -604,64 +605,68 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, t
 
     return gcode
 
-def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, optimum_focal_distance: int, 
-        feedrate: int, laser_power: int, include_edge_cuts: bool, laser_passes: int, debug: bool=False) -> str:
+def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
     '''
     :param gerber_file: the file that we want to get the holes coordinate from
-    :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
-    :param optimum_focal_distance: the distance at the laser is at its best focal distance
-    :param feedrate: integer mm/minute, only for x and y movement, z movement is hardcoded here
-    :param laser_power: laser intensity for toner transfer, please note that the value is 0-250, default value is 150 as tested.
-    :param passes: number of passes done by laser
+    :param settings: the settings parameter
 
     :return: This function creates the gcode content as string according to the input coordinates
     '''
     gcode = ''
 
-    gcode += '\n; The following gcode is the PCB trace laser marking gcode\n\n'
+    gcode += '\n; Spindle trace laser engraving Gcode\n\n'
 
-    # Setting GRBL mode to laser mode
-    gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
+    # Setting GRBL mode to spindle mode
+    #TODO: check first if it's not already set, Saving EEPROM with every run will wear it out with time
+    # gcode += "$32=0 ; Setting GRBL mode to spindle mode\n\n"
 
-    # Activiate Tool number 1, The Laser Module
-    if tool:
-        gcode += tool(ToolChange.Select, Tool.Laser)
+    #TODO: add bit change code here
+    if settings.tool:
+        # Activiate Tool number 1, The Laser Module
+        gcode += tool(ToolChange.Select, settings.Tool.Laser)
     
-    # Setting the laser module movment feedrate
-    gcode += f'F{feedrate} ; setting default feedrate\n\n'
+    # Making sure spindle is at Up position
+    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Making Sure Spindle is Up position', z=settings.spindle_Z_up_position)
 
-    # Setting the Optimum focal distance by moving the Z position in the correct coordinate
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Moving to correct focal length Z position\n', z=optimum_focal_distance)
-
-    # Setting the correct laser Power
-    gcode += f"S{laser_power} ; Setting Laser Power\n\n"
+    #  Starting Spindle and Setting the correct spindle speed
+    gcode += f"M3S{settings.spindle_speed} ; Spindle On and Setting spindle Speed\n\n"
 
     ### PCB trace laser marking Gcode
-    # Getting Offset Points for laser module to burn in 
+    # Getting Offset Points for spindle to engrave
     # The bulk of the code is in this single line ;)
-    coordinate_lists = get_laser_coords(gerber_obj, include_edge_cuts, debug=debug)  
+    coordinate_lists = get_laser_coords(gerber_obj, settings.include_edge_cuts, debug=settings.debug)  
+    for ind, coordinate_list in enumerate(coordinate_lists):
+        gcode += f"; Engraving Trace No. {ind}\n"
 
-    gcode += f"; Number of passes: {laser_passes}\n\n"
-    for pass_num in range(laser_passes):
-        gcode += f'; Pass number: {pass_num+1}\n'
+        # Go to start of Loop
+        gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(coordinate_list[0].x,
+                                                                        coordinate_list[0].y,
+                                                                        settings.spindle_Z_up_position))
 
-        for coordinate_list in coordinate_lists:
-            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
-            gcode += "M3\n"
+        # Spindle Down, Start engraving
+        gcode += move(CoordMode.ABSOLUTE, Z=settings.spindle_Z_down_engrave, feedrate=settings.spindle_feedrate_Z_engrave)
 
-            for coordinate in coordinate_list[1:]:
-                gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate)
+        # Setting engraving feedrate
+        gcode += f'F{settings.spindle_feedrate_XY_engrave} ; setting default feedrate\n'
 
-            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])  #TODO: ??!??!?! what is this ???!?!
-            gcode += "M5\n"
+        # Continue Loop)
+        for coordinate in coordinate_list[1:]:
+            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate)
 
-    gcode += '\n'
+        # Complete the Loop
+        gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
+
+        # Spindle Up, Stop engraving
+        gcode += move(CoordMode.ABSOLUTE, Z=settings.spindle_Z_up_position, feedrate=settings.spindle_feedrate_Z_up)
+
+        gcode += '\n'
 
     # Deactivate End Effector Signal
-    gcode += f'M5 ; Disable End-Effector Signal\n\n'
+    gcode += f'\nM5 ; Disable Spindle\n\n'
 
     # Get the tool back and deselect it
-    if tool:
+    #TODO: add bit change code here
+    if settings.tool:
         gcode += tool(ToolChange.Deselect, Tool.Laser)
 
     return gcode

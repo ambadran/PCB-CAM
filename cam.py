@@ -812,7 +812,7 @@ def visualize_group(group, gbr_obj=None):
     print(f"Visualizaing Trace number: {num+2} out of {len_group}")
     visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
-def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool=True, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
+def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
 

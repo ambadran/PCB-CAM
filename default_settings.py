@@ -30,22 +30,25 @@ default_settings_dict = {
 
     ### spindle tweaking values
     # Z positions
-    "router_Z_up_position": 10,
-    "router_Z_down_position": 13,
+    "spindle_Z_up_position": 1,
+    "spindle_Z_down_engrave": 0.1,
+    "spindle_Z_down_hole": 2,
     # Feedrates
-    "router_feedrate_XY": 600,
-    "router_feedrate_Z_drilling": 1,
-    "router_feedrate_Z_up_from_pcb": 20,
+    "spindle_feedrate_XY_engrave": 300,
+    "spindle_feedrate_XY_hole": 600,
+    "spindle_feedrate_Z_engrave": 10,
+    "spindle_feedrate_Z_hole": 50,
+    "spindle_feedrate_Z_up": 100,
     # Power intensities
-    "spindle_speed": 255,
+    "spindle_speed": 400,
 
-    ### Pen Tweaking Values
-    # Z positions
-    "pen_down_position": 10,
-    # Feedrates
-    "ink_laying_feedrate": 100,
-    # Tip Thickness in mm
-    "tip_thickness": 4,
+    # ### Pen Tweaking Values
+    # # Z positions
+    # "pen_down_position": 10,
+    # # Feedrates
+    # "ink_laying_feedrate": 100,
+    # # Tip Thickness in mm
+    # "tip_thickness": 4,
 
     ### Laser Module Tweaking Values
     # Z positions

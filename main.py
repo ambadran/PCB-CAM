@@ -54,7 +54,7 @@ def main(settings: Settings):
     ### Main Code ###
     '''
     # Error checking the arguments
-    if  not settings.holes and not settings.ink and not settings.laser and not settings.spindle:
+    if  not settings.holes and not settings.laser and not settings.spindle:
         raise ValueError("\nMust choose what Gcode to export!\nOptions:\n1- '--all-gcode' : exports all 3 gcodes\n2- '--holes' : Adds hole drilling gcode to Gcode file\n3- '--ink' : Adds ink laying gcode to Gcode file\n4- '--laser' : Adds laser drawing gcode to Gcode file")
     if settings.laser and settings.spindle:
         raise ValueError("\nCan't have two engraving methods! Please either spindle OR laser.")
@@ -96,27 +96,18 @@ def main(settings: Settings):
     ##################
 
     # Creating the PCB traces by spindle engraving
-    #TODO: add some way to set GRBL mode for laser or spindle operation
     if settings.spindle:
-        gcode += generate_spindle_engraving_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
-                settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
-                debug=settings.debug)
+        gcode += generate_spindle_engraving_trace_gcode(gerber_obj, settings)
         debug_msg += "Exported Spindle PCB engraving Gcode..\n"
 
     # Creating the PCB traces by laser engraving
-    #TODO: add some way to set GRBL mode for laser or spindle operation
     if  settings.laser:
-        gcode += generate_laser_engraving_trace_gcode(gerber_obj, settings.tool, settings.optimum_laser_Z_position, 
-                settings.pcb_trace_feedrate, settings.laser_power, settings.include_edge_cuts, settings.laser_passes, 
-                debug=settings.debug)
+        gcode += generate_laser_engraving_trace_gcode(gerber_obj, settings)
         debug_msg += "Exported laser PCB engraving Gcode..\n"
 
     # Creating the holes_gcode
     if settings.holes:
-        gcode += generate_holes_gcode(gerber_obj, settings.tool, settings.router_Z_up_position, 
-                                      settings.router_Z_down_position, settings.router_feedrate_XY, 
-                                      settings.router_feedrate_Z_drilling, settings.router_feedrate_Z_up_from_pcb,
-                                      settings.spindle_speed, debug=settings.debug)
+        gcode += generate_holes_gcode(gerber_obj, settings)
         debug_msg += "Exported spindle hole drilling Gcode..\n"
 
     # Machine Deinit
