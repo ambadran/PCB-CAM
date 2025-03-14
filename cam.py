@@ -872,12 +872,14 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts:
     whole_thing = shapely_objects_dark_subtracted[0]
     for shapely_object in shapely_objects_dark_subtracted[1:]:
         whole_thing = whole_thing.union(shapely_object)
+    whole_thing = list(whole_thing.geoms)
 
     # Applying Offset to coords if exists
     if offset:
-        whole_thing.buffer(offset)
-
-    whole_thing = list(whole_thing.geoms)
+        whole_thing_offseted = []
+        for polygon_ in whole_thing:
+            whole_thing_offseted.append(polygon_.buffer(offset))
+        whole_thing = whole_thing_offseted
 
     # Getting list of list of extrior coordinate of each Shapley Polygon
     coord_list_list = [list(polygon_.exterior.coords) for polygon_ in whole_thing]
@@ -928,7 +930,7 @@ if __name__ == '__main__':
     
     gerber_obj = gerber.read(gerber_file)
 
-    print(get_traces_outlines(gerber_obj, False, offset=1, debug=True))
+    print(get_traces_outlines(gerber_obj, False, offset=0.2, debug=True))
 
     
    
