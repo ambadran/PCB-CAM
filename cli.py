@@ -78,6 +78,7 @@ if __name__ == '__main__':
     # Extra settings for a specific operation
     addArg('include_edge_cuts', "Include Edge cuts in laser marking process", bool)
     addArg('laser_passes', "Number of passes for laser marking Gcode", int)
+    addArg('spindle_bit_offset', "The Diameter of the spindle bit offset to make sure when engraving trace width, it is as intended", float)
 
     addArg('debug', "Shows Simulation of the PCB laser trace coordinates as well as other debug Info.", bool)
 

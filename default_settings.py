@@ -41,6 +41,8 @@ default_settings_dict = {
     "spindle_feedrate_Z_up": 100,
     # Power intensities
     "spindle_speed": 400,
+    # Spindle Bit Offset for engraving
+    "spindle_bit_offset": 0.8,
 
     # ### Pen Tweaking Values
     # # Z positions

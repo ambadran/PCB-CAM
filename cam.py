@@ -21,10 +21,20 @@ import turtle
 import random
 import math
 import numpy as np
+import tkinter as tk
 
 # Screen Dimensions
-DEVICE_W = 1440 # 2560
-DEVICE_H = 1160 # 1600
+def get_screen_width_height() -> tuple[int, int]:
+    '''
+    using tkinter to get the current display height and width
+    '''
+    root = tk.Tk()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.destroy()
+
+    return (screen_width, screen_height)
+DEVICE_W, DEVICE_H = get_screen_width_height()
 START_X = 0
 START_Y = 0
 
@@ -801,7 +811,9 @@ def visualize_group(group, gbr_obj=None):
     # multiplier = (DEVICE_W/gbr_obj.size[0]) if (gbr_obj.size[0] > gbr_obj.size[1]) else (DEVICE_H/gbr_obj.size[1])
     # multiplier /= 2
     # multiplier = 50
-    multiplier = 5
+    multiplier_width = DEVICE_W/gbr_obj.size[0]/4
+    multiplier_height = DEVICE_H/gbr_obj.size[1]/4
+    multiplier = max(multiplier_width, multiplier_height)
 
     len_group = len(group)
     num = 0  # if only one object in the group
@@ -812,17 +824,19 @@ def visualize_group(group, gbr_obj=None):
     print(f"Visualizaing Trace number: {num+2} out of {len_group}")
     visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
-def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
+def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool, offset:Optional[float]=None, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
 
-    Meant for laser gcode where the laser go to first coordinate in a list, turn laser on, go to all coordinates, then laser OFF, then
-    go to first coordinate in the next list, turn laser on , go to all coordiantes, then laser OFF, etc..
+    Meant for laser gcode where the engraving tool go to first coordinate in a list, start engraving, go to all coordinates, then stop engraving, then
+    go to first coordinate in the next list and start over..
 
     :param gerber: Gerber Object from the gerber library
-    :param include_edge_cuts: includes the edge cuts as part of pcb laser marking process
+    :param include_edge_cuts: includes the PCB edge cuts
+    :param offset: offset for spindle bit diameter
     :param resolution: the number of decimal places for coordinates
     :param debug: enable debugging info and display laser motion
+
     :return: list of list of coordinates of one continious trace
 
     #TODO: implement include_edge_cuts functionality
@@ -858,6 +872,11 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     whole_thing = shapely_objects_dark_subtracted[0]
     for shapely_object in shapely_objects_dark_subtracted[1:]:
         whole_thing = whole_thing.union(shapely_object)
+
+    # Applying Offset to coords if exists
+    if offset:
+        whole_thing.buffer(offset)
+
     whole_thing = list(whole_thing.geoms)
 
     # Getting list of list of extrior coordinate of each Shapley Polygon
@@ -871,6 +890,7 @@ def get_laser_coords(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bo
     # Joinging the exterior and interiors lists of Points
     coord_list_list.extend(tmp)
 
+    # Visualizing the traces
     if debug:
         visualize_group(coord_list_list, gbr_obj=gerber_obj)
 
@@ -902,13 +922,13 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> l
     pass
 
 if __name__ == '__main__':
-    # gerber_file = 'gerber_files/limit_switch-F_Cu 2.gbr'
-    # gerber_file_path = '/home/mr-atom/Projects/PCB_manufacturer/Circuit/limit_switch/Gerber/limit_switch-F_Cu.gbr'
-    gerber_file= "gerber_files/region_object.gbr"
+    # gerber_file= "gerber_files/region_object.gbr"
+
+    gerber_file = "gerber_files/default.gbr"
     
     gerber_obj = gerber.read(gerber_file)
 
-    print(get_laser_coords(gerber_obj, debug=True))
+    print(get_traces_outlines(gerber_obj, False, offset=1, debug=True))
 
     
    
