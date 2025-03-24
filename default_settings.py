@@ -85,8 +85,12 @@ default_settings_dict = {
     # other options
 
     'dont_export_gbr': False,  # saves the gbr file after recenter and mirror (if settings allow it)
-    'new_gbr_name': 'mirrored_and_offseted.gbr'
+    'new_gbr_name': 'mirrored_and_offseted.gbr',
 
+    'create_height_map': False, # executed when triggered
+    'height_map_resolution': 5,
+    'created_height_map_default_file_name': "height_map.json",
+    'height_map': "height_map.json", # default height map to use
 
 }
 

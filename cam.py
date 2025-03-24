@@ -824,7 +824,12 @@ def visualize_group(group, gbr_obj=None):
     print(f"Visualizaing Trace number: {num+2} out of {len_group}")
     visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
-def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts: bool, offset:Optional[float]=None, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
+def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, 
+        include_edge_cuts: bool, 
+        offset:Optional[float] = None, 
+        resolution: int = DEFAULT_RESOLUTION, 
+        height_map: Optional[tuple[tuple[float, float, float]]] = None,
+        debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
 
@@ -841,6 +846,7 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts:
 
     #TODO: implement include_edge_cuts functionality
     #TODO: think about whether to round here or in the gcode_tools functions
+    #TODO: apply height map
     '''
 
     # Converting the Gerber Object to Shapely Objects into a dark group and a light group
@@ -892,6 +898,8 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, include_edge_cuts:
     # Joinging the exterior and interiors lists of Points
     coord_list_list.extend(tmp)
 
+    # Applying height map, finding the nearst Z value to any coordinate and assigning
+
     # Visualizing the traces
     if debug:
         visualize_group(coord_list_list, gbr_obj=gerber_obj)
@@ -922,6 +930,14 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> l
     '''
     '''
     pass
+
+def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, resolution: int) -> tuple[tuple[float, float, float]]:
+    '''
+    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
+    '''
+    height_map = []
+
+    return height_map
 
 if __name__ == '__main__':
     # gerber_file= "gerber_files/region_object.gbr"

@@ -86,7 +86,7 @@ def get_coordinate_from_kwargs(kwargs) -> str:
                     tmp = float(value[0])
                     tmp = float(value[1])
                 except Exception:
-                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0]), type(value[1])}")
+                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0])}, {type(value[1])}")
 
                 x_val = value[0]
                 if type(x_val) == float:
@@ -102,8 +102,9 @@ def get_coordinate_from_kwargs(kwargs) -> str:
                 try: # checking internal values are numbers
                     tmp = float(value[0])
                     tmp = float(value[1])
+                    tmp = float(value[2])
                 except Exception:
-                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0]), type(value[1])}")
+                    raise ValueError(f"Point list must only contain integers or floats, passed type is {type(value[0])}, {type(value[1])}, {type(value[2])}")
 
                 x_val = value[0]
                 if type(x_val) == float:
@@ -631,14 +632,24 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     ### PCB trace laser marking Gcode
     # Getting Offset Points for spindle to engrave
     # The bulk of the code is in this single line ;)
-    coordinate_lists = get_traces_outlines(gerber_obj, settings.include_edge_cuts, settings.spindle_bit_offset, debug=settings.debug)  
+    if settings.height_map:
+        with open(settings.height_map, 'r') as f:
+            height_map = json.load(f)
+        coordinate_lists = get_traces_outlines(gerber_obj, 
+                settings.include_edge_cuts, settings.spindle_bit_offset, 
+                height_map=height_map, debug=settings.debug)
+    else:
+        coordinate_lists = get_traces_outlines(gerber_obj, 
+                settings.include_edge_cuts, settings.spindle_bit_offset, 
+                debug=settings.debug)
+
     for ind, coordinate_list in enumerate(coordinate_lists):
         gcode += f"; Engraving Trace No. {ind}\n"
 
         # Go to start of Loop
         gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(coordinate_list[0].x,
-                                                                        coordinate_list[0].y,
-                                                                        settings.spindle_Z_up_position))
+                                                                    coordinate_list[0].y,
+                                                                    settings.spindle_Z_up_position))
 
         # Spindle Down, Start engraving
         gcode += move(CoordMode.ABSOLUTE, Z=settings.spindle_Z_down_engrave, feedrate=settings.spindle_feedrate_Z_engrave)

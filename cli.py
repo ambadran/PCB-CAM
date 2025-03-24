@@ -10,9 +10,14 @@ from main import Settings, main
 from default_settings import default_settings_dict
 from typing import Optional
 
-def addArg(name: str, help_str: str, var_type, one_letter: Optional[str]=None) -> None:
+def addArg(name: str, help_str: str, var_type, one_letter: Optional[str]=None, three_state: bool=False) -> None:
     '''
     implements parser.add_argument() easily
+
+    :param three_state: if true, this will assign the 'name' variable into either of 3 values
+        --name <value> -> will assign the 'name' variable into <value>
+        --name          -> will assign the 'name' variable into a default value)
+    and when not called -> will assign the 'name' variable into False
     '''
     global parser
     global default_settings_dict
@@ -24,6 +29,32 @@ def addArg(name: str, help_str: str, var_type, one_letter: Optional[str]=None) -
         cli_name = name.replace('_', '-')
     else:
         cli_name = name
+
+    if three_state:
+        #type checking
+        if var_type not in [int, float, str]:
+            raise ValueError("unknown variable type for three state variables")
+
+        if one_letter:
+            parser.add_argument(
+                    f"-{one_letter}",
+                    f"--{cli_name}",
+                    type=var_type,
+                    nargs="?",
+                    const=default_settings_dict[name], # default value if --name is provided
+                    default=None, # default value if --name is not provided
+                    help=help_str
+                    )
+        else:
+            parser.add_argument(
+                    f"--{cli_name}", 
+                    type=var_type,
+                    nargs="?",
+                    const=default_settings_dict[name], # default value if --name is provided
+                    default=None, # default value if --name is not provided
+                    help=help_str
+                    )
+ 
 
     if var_type != bool:
         if one_letter:
@@ -59,7 +90,7 @@ if __name__ == '__main__':
     addArg('dont_export_gbr', "Doesn't allow exporting of the mirrored_and_offseted gerber file", bool)
     addArg('new_gbr_name', "The name of the newly created Gerber File after mirroring and offsetting", str)
 
-    # Gerber file modifications settings
+    # Gerber file modifications seFalsettings
     addArg('mirrored', "Mirror Gerber file. (All coordinates are mirrored)", bool, 'M')
     addArg('rotated', "Rotate Gerber file 90 degrees. (All coordinates are rotated 90d)", bool, 'R')
     addArg('x_offset', "Value PCB offseted from X axis", int)
@@ -81,6 +112,11 @@ if __name__ == '__main__':
     addArg('spindle_bit_offset', "The Diameter of the spindle bit offset to make sure when engraving trace width, it is as intended", float)
 
     addArg('debug', "Shows Simulation of the PCB laser trace coordinates as well as other debug Info.", bool)
+
+    # Height map command
+    addArg('create_height_map', "generates height map for a PCB", bool)
+    addArg('height_map_resolution', "When creating height map, resolution of height map in mm; take measurements every how much mm", int)
+    addArg('height_map', "A path to a .json file containing height map to be taken into account in the creation of gcode", str, three_state=True)
 
     ### Extracting User inputs!
     # Getting arguments
