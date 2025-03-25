@@ -9,18 +9,17 @@ with warnings.catch_warnings():
     # suppressing a stupid syntax warning to convert 'is not' to '!='
     warnings.filterwarnings("ignore", category=SyntaxWarning)
     import gerber
-
 try:
     from shapely import Point, MultiPoint, LineString, LinearRing, box, Polygon
 except ImportError:
     from shapely.geometry import Point, MultiPoint, LineString, LinearRing, box, Polygon
-
 from matplotlib.patches import Ellipse
 from copy import deepcopy
 import turtle
 import random
 import math
 import numpy as np
+from scipy.interpolate import interp2d
 import tkinter as tk
 
 # Screen Dimensions
@@ -829,6 +828,7 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
         offset:Optional[float] = None, 
         resolution: int = DEFAULT_RESOLUTION, 
         height_map: Optional[tuple[tuple[float, float, float]]] = None,
+        Z_offset_from_0: Optional[float] = None,
         debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
@@ -840,6 +840,8 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
     :param include_edge_cuts: includes the PCB edge cuts
     :param offset: offset for spindle bit diameter
     :param resolution: the number of decimal places for coordinates
+    :param height_map: if given, will interpolate resultant trace coord list Z value to match the grid coords of height map
+    :param Z_offset_from_0: how much up from 0 should the spindle bit be. useful for V-bits which should be slightly above 0
     :param debug: enable debugging info and display laser motion
 
     :return: list of list of coordinates of one continious trace
@@ -898,7 +900,28 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
     # Joinging the exterior and interiors lists of Points
     coord_list_list.extend(tmp)
 
-    # Applying height map, finding the nearst Z value to any coordinate and assigning
+    # Get function to return Z value
+    if height_map:
+        ### Applying height map, interpolating Z value from height map
+        # preparing the variables that needs to be passed to the interpolate function
+        x_coords = sorted({point[0] for point in height_map})
+        y_coords = sorted({point[1] for point in height_map})
+        z_grid = np.zeros((len(y_coords), len(x_coords)))
+        for point in height_map:
+            x, y, Z_offset_from_0 = point
+            i = y_coords.index(y)
+            j = x_coords.index(x)
+            z_grid[i, j] = z
+        # get the interpolate function 
+        get_z = interp2d(x_coords, y_coords, z_grid, kind='linear')
+
+    else:
+        get_z = lambda x, y: Z_offset_from_0
+
+    # applying appropriate Z value to coord_list_list
+    for coord_list in coord_list_list:
+        for coord in coord_list_list:
+            coord.z = get_z(coord.x, coord.y)
 
     # Visualizing the traces
     if debug:
@@ -933,9 +956,23 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> l
 
 def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, resolution: int) -> tuple[tuple[float, float, float]]:
     '''
+    :param resolution: resolution of height map in mm; take measurements every how much mm
+
     returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
     '''
+    print("ASSUMING THE BIT IS AT COORD X AND COORD Y (0, 0) OF THE PCB. Z SHOULD BE WITHING 3MM ABOVE PCB\n")
+
     height_map = []
+    x_size = gerber_obj.size[0]
+    y_size = gerber_obj.size[1]
+
+    # creating the waypoints the probe will travel to
+    for x in range(x_size//resolution):
+        for y in range(y_size//resolution):
+            height_map.append([x, y, 0])
+
+
+
 
     return height_map
 
@@ -949,4 +986,4 @@ if __name__ == '__main__':
     print(get_traces_outlines(gerber_obj, False, offset=0.2, debug=True))
 
     
-   
+

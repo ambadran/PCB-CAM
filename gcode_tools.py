@@ -610,6 +610,13 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
 
     :return: This function creates the gcode content as string according to the input coordinates
     '''
+    # Preparations
+    if settings.height_map:
+        with open(settings.height_map, 'r') as f:
+            height_map = json.load(f)
+    else:
+        height_map = None
+
     gcode = ''
 
     gcode += '\n; Spindle trace laser engraving Gcode\n\n'
@@ -629,20 +636,17 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     #  Starting Spindle and Setting the correct spindle speed
     gcode += f"M3S{settings.spindle_speed} ; Spindle On and Setting spindle Speed\n\n"
 
-    ### PCB trace laser marking Gcode
-    # Getting Offset Points for spindle to engrave
+    # getting the list of list of path coords :D
     # The bulk of the code is in this single line ;)
-    if settings.height_map:
-        with open(settings.height_map, 'r') as f:
-            height_map = json.load(f)
-        coordinate_lists = get_traces_outlines(gerber_obj, 
-                settings.include_edge_cuts, settings.spindle_bit_offset, 
-                height_map=height_map, debug=settings.debug)
-    else:
-        coordinate_lists = get_traces_outlines(gerber_obj, 
-                settings.include_edge_cuts, settings.spindle_bit_offset, 
-                debug=settings.debug)
+    coordinate_lists = get_traces_outlines(
+            gerber_obj, 
+            settings.include_edge_cuts, 
+            settings.spindle_bit_offset, 
+            height_map=height_map, 
+            Z_offset_from_0=settings.spindle_Z_down_engrave,
+            debug=settings.debug)
 
+    ### PCB trace engraving Gcode
     for ind, coordinate_list in enumerate(coordinate_lists):
         gcode += f"; Engraving Trace No. {ind}\n"
 
@@ -652,7 +656,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
                                                                     settings.spindle_Z_up_position))
 
         # Spindle Down, Start engraving
-        gcode += move(CoordMode.ABSOLUTE, Z=settings.spindle_Z_down_engrave, feedrate=settings.spindle_feedrate_Z_engrave)
+        gcode += move(CoordMode.ABSOLUTE, Z=coordinate_list[0].z, feedrate=settings.spindle_feedrate_Z_engrave)
 
         # Setting engraving feedrate
         gcode += f'F{settings.spindle_feedrate_XY_engrave} ; setting default feedrate\n'
