@@ -54,7 +54,10 @@ def main(settings: Settings):
     ### Main Code ###
     '''
     # Error checking the arguments
-    if not settings.height_map:
+    if settings.create_height_map and (settings.holes or settings.laser or settings.spindle):
+        raise ValueError("can't create height map and generate PCB gcode at once!")
+
+    elif not settings.create_height_map:
         if not settings.holes and not settings.laser and not settings.spindle:
             raise ValueError("\nMust choose what Gcode to export!\nOptions:\n1- '--all-gcode' : exports all 3 gcodes\n2- '--holes' : Adds hole drilling gcode to Gcode file\n3- '--ink' : Adds ink laying gcode to Gcode file\n4- '--laser' : Adds laser drawing gcode to Gcode file")
         if settings.laser and settings.spindle:
@@ -77,12 +80,14 @@ def main(settings: Settings):
 
     # height_map mode
     if settings.create_height_map:
-        height_map = generate_height_map(gerber_obj, settings.height_map_resolution)
+        height_map = generate_height_map(gerber_obj, settings)
         
         dir_path = os.path.dirname(settings.src)
         dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
         with open(dir_path_with_slash+settings.created_height_map_default_file_name, "w") as f:
             json.dump(height_map, f)
+
+        return None
 
     # Saving New Gerber File
     if not settings.dont_export_gbr:

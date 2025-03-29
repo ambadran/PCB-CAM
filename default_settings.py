@@ -88,6 +88,8 @@ default_settings_dict = {
     'new_gbr_name': 'mirrored_and_offseted.gbr',
 
     'create_height_map': False, # executed when triggered
+    'serial_port': "/dev/ttyACM0",
+    'serial_baud': 115200,
     'height_map_resolution': 5,
     'created_height_map_default_file_name': "height_map.json",
     'height_map': "height_map.json", # default height map to use

@@ -115,6 +115,8 @@ if __name__ == '__main__':
 
     # Height map command
     addArg('create_height_map', "generates height map for a PCB", bool)
+    addArg('serial_port', "Serial Port Path to connect to the grbl Controller and get create height map", str)
+    addArg('serial_baud', "Baud Rate of grbl Controller serial port", int)
     addArg('height_map_resolution', "When creating height map, resolution of height map in mm; take measurements every how much mm", int)
     addArg('height_map', "A path to a .json file containing height map to be taken into account in the creation of gcode", str, three_state=True)
 

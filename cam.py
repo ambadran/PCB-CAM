@@ -21,6 +21,7 @@ import math
 import numpy as np
 from scipy.interpolate import interp2d
 import tkinter as tk
+import serial
 
 # Screen Dimensions
 def get_screen_width_height() -> tuple[int, int]:
@@ -828,7 +829,7 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
         offset:Optional[float] = None, 
         resolution: int = DEFAULT_RESOLUTION, 
         height_map: Optional[tuple[tuple[float, float, float]]] = None,
-        Z_offset_from_0: Optional[float] = None,
+        Z_offset_from_0: Optional[float] = 0,
         debug: bool=False) -> list[list[Point]]:
     '''
     Get list of list of coordinates, each list is one continious piece of trace.
@@ -916,12 +917,13 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
         get_z = interp2d(x_coords, y_coords, z_grid, kind='linear')
 
     else:
-        get_z = lambda x, y: Z_offset_from_0
+        get_z = lambda x, y: [Z_offset_from_0]
 
     # applying appropriate Z value to coord_list_list
-    for coord_list in coord_list_list:
-        for coord in coord_list_list:
-            coord.z = get_z(coord.x, coord.y)
+    for coord_list_ind, coord_list in enumerate(coord_list_list):
+        for coord_ind, coord in enumerate(coord_list):
+                coord_list_list[coord_list_ind][coord_ind] = Point(coord.x, coord.y, get_z(coord.x, coord.y)[0])
+                print(coord_list_list[coord_list_ind][coord_ind])
 
     # Visualizing the traces
     if debug:
@@ -953,28 +955,6 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> l
     '''
     '''
     pass
-
-def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, resolution: int) -> tuple[tuple[float, float, float]]:
-    '''
-    :param resolution: resolution of height map in mm; take measurements every how much mm
-
-    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
-    '''
-    print("ASSUMING THE BIT IS AT COORD X AND COORD Y (0, 0) OF THE PCB. Z SHOULD BE WITHING 3MM ABOVE PCB\n")
-
-    height_map = []
-    x_size = gerber_obj.size[0]
-    y_size = gerber_obj.size[1]
-
-    # creating the waypoints the probe will travel to
-    for x in range(x_size//resolution):
-        for y in range(y_size//resolution):
-            height_map.append([x, y, 0])
-
-
-
-
-    return height_map
 
 if __name__ == '__main__':
     # gerber_file= "gerber_files/region_object.gbr"

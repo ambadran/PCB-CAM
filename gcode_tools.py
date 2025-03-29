@@ -683,8 +683,6 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
 
     return gcode
 
-
-
 def export_gcode(gcode: str, file_name: str) -> None:
 
     '''
@@ -695,6 +693,28 @@ def export_gcode(gcode: str, file_name: str) -> None:
     with open(file_name, 'w') as g_file:
         g_file.write(gcode)
 
+def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple[tuple[float, float, float]]:
+    '''
+    :param resolution: resolution of height map in mm; take measurements every how much mm
+
+    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
+    '''
+    print("ASSUMING THE BIT IS AT COORD X AND COORD Y (0, 0) OF THE PCB. Z SHOULD BE WITHING 3MM ABOVE PCB\n")
+
+    height_map = []
+    x_size = gerber_obj.size[0]
+    y_size = gerber_obj.size[1]
+
+    # creating the waypoints the probe will travel to
+    for x in range(x_size//resolution):
+        for y in range(y_size//resolution):
+            height_map.append([x, y, 0])
+
+    # establishing connection
+    with serial.Serial(settings.serial_port, settings.serial_baud) as ser:
+
+
+    return height_map
 
 if __name__ == '__main__':
 
