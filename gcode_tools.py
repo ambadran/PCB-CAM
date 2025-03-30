@@ -4,6 +4,7 @@ This file has function to generate the gcode we want
 from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
+import regex
 
 import warnings
 with warnings.catch_warnings():
@@ -699,22 +700,47 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
 
     returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
     '''
-    print("ASSUMING THE BIT IS AT COORD X AND COORD Y (0, 0) OF THE PCB. Z SHOULD BE WITHING 3MM ABOVE PCB\n")
+    # Making sure initial state is known
+    user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\n\nConfirm (y/n): ").lower()
+    if user_in == 'n':
+        print("Aborting..")
+        return None
+    elif user_in not in ['y', 'yes']:
+        print("Unknown answer.")
+        return None
+    print()
 
+    # creating the height map waypoints the probe will travel to
     height_map = []
-    x_size = gerber_obj.size[0]
-    y_size = gerber_obj.size[1]
-
-    # creating the waypoints the probe will travel to
-    for x in range(x_size//resolution):
-        for y in range(y_size//resolution):
+    x_size = gerber_obj.size[0]  # max pcb length in mm
+    y_size = gerber_obj.size[1]  # max pcb width in mm
+    for x in range(0, ceil(x_size), resolution):
+        for y in range(0, ceil(y_size), resolution):
             height_map.append([x, y, 0])
+    height_map.append([ceil(x_size), ceil(y_size)])  # Making sure not out of bound coords can be passed to interpolation function
 
     # establishing connection
     with serial.Serial(settings.serial_port, settings.serial_baud) as ser:
 
+        # Check grbl device responsive
+        ser.write(b'\n')
+        response = ser.readline()
+        if 'ok' not in response:
+            raise ValueError("grbl not responsive!")
 
-    return height_map
+        for ind, coord in enumerate(height_map):
+            ser.write(move(CoordMode.ABSOLUTE, use_00=True, x=coord[0], y=coord[1], z=1).encode())
+            confirmation = ser.readline()
+            if confirmation != 'ok':
+                raise ValueError("Didn't receive 'ok' after sending gcode")
+            ser.write(b'G91G98.2Z-2F10')
+            probe_value = ser.readline()
+            #TODO: use regex to get z probe value, deal with wrong response or alarm
+            
+            height_map[ind][2] = probe_value  # finally, set the probe Z value
+
+    # convert to tuple and return
+    return ((coord[0], coord[1], coord[2]) for coord in height_map)
 
 if __name__ == '__main__':
 
