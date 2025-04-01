@@ -4,7 +4,7 @@ This file has function to generate the gcode we want
 from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
-import regex
+import re
 
 import warnings
 with warnings.catch_warnings():
@@ -43,15 +43,62 @@ def increment_current_decimal_point(value: float, current_decimal_points: int, m
     return return_value
 
 
+class UnitMode(Enum):
+    INCH = 20
+    MM = 21
+
+class DistanceMode(Enum):
+    ABSOLUTE = 90
+    INCREMENTAL = 91
+
+class MotionMode(Enum):
+    RAPID = 0
+    USE_FEEDRATE = 1
+    CIRCULAR_CW = 2
+    CIRCULAR_CCW = 3
+    PROBE_TOWARD_ERROR = 38.2
+    PROBE_TOWARD_NO_ERROR = 38.3
+    PROBE_AWAY_ERROR = 38.4
+    PROBE_AWAY_NO_ERROR = 38.5
+    NO_MODE = 80
+
+class FeedRateMode(Enum):
+    ONE_PER_MINUTE = 93
+    UNIT_PER_MIN = 94
+
+class PlaneSelect(Enum):
+    XY = 17
+    XZ = 18
+    YZ = 19
+
+class ProgramMode(Enum): 
+    PROGRAM_STOP = 0
+    OPTIONAL_PROGRAM_STOP = 1
+    PROGRAM_END = 2
+    PROGRAM_END_REWIND = 30
+
+class SpindleState(Enum):
+    ON_CW = 3
+    ON_CCW = 4
+    OFF = 5
+
+class CoolantState(Enum):
+    FLOOD = 7
+    MIST = 8
+    FLOOD_MIST_OFF = 9
+
+ALL_OPTION_GROUPS = {UnitMode: "G", 
+        DistanceMode: "G", 
+        MotionMode: "G", 
+        FeedRateMode: "G", 
+        PlaneSelect: "G", 
+        ProgramMode: "M", 
+        SpindleState: "M", 
+        CoolantState: "M"}
+
 class ToolChange(Enum):
     Deselect = 0
     Select = 1
-
-
-class CoordMode(Enum):
-    ABSOLUTE = 0
-    INCREMENTAL = 1
-
 
 class Tool(Enum):
     Empty = 0
@@ -168,7 +215,7 @@ def get_coordinate_from_kwargs(kwargs) -> str:
     return gcode
 
 
-def set_grbl_coordinate(coordinate_mode: CoordMode, comment: Optional[str]=None, **coordinate) -> str:
+def set_grbl_coordinate(distance_mode: DistanceMode, comment: Optional[str]=None, **coordinate) -> str:
     '''
     overwrites the current grbl working coordinate
     :param kwargs: must input either coordinate=[x, y] or one of x=int, y=int, z=int or a combination of those three
@@ -177,9 +224,9 @@ def set_grbl_coordinate(coordinate_mode: CoordMode, comment: Optional[str]=None,
     '''
     comment_available = False
 
-    if coordinate_mode == CoordMode.ABSOLUTE:
+    if distance_mode == DistanceMode.ABSOLUTE:
         gcode = "G10 P0 L20 "
-    elif coordinate_mode == CoordMode.INCREMENTAL:
+    elif distance_mode == DistanceMode.INCREMENTAL:
         gcode = '#TODO '
     else:
         raise ValueError("Unsupported Mode!")
@@ -223,7 +270,7 @@ def general_machine_init() -> str:
     gcode += f"$H ; Homing :)\n"
 
     # Make sure grbl understands it's at zero now
-    gcode += set_grbl_coordinate(CoordMode.ABSOLUTE,
+    gcode += set_grbl_coordinate(DistanceMode.ABSOLUTE,
             comment="Force Reset current coordinates after homing\n", 
             coordinate=Point(0, 0, 0))
     
@@ -238,47 +285,86 @@ def general_machine_deinit() -> str:
     '''
     gcode = ''
     gcode += '; Machine deinitialization Sequence... \n'
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(0, 0, 0))
+    gcode += move(motion_mode=MotionMode.RAPID, coordinate=Point(0, 0, 0))
     gcode += 'B0 ; Turn Machine OFF\n'
 
     return gcode
 
+def set_options(*options) -> str:
+    '''
+    motion Mode
+    distance Mode
+    unit Mode
+    plane select
+    feedrate Mode
+    program Mode
+    spindle state
+    coolant state
+    '''
+    global ALL_OPTION_GROUPS
 
-def move(coordinate_mode: CoordMode, feedrate: Optional[int]=None, use_00: bool=False, comment: Optional[str]=None, **coordinates) -> str:
+    gcode = ""
+
+    processed_options = set()
+    processed_modal_groups = set() 
+    for option in options:
+        for option_group, command_keyword in ALL_OPTION_GROUPS.items():
+            if option in option_group._member_map_.values():
+
+                if option_group in processed_modal_groups:
+                    raise ValueError("Can't pass two options of the same Modal Group")
+
+                processed_modal_groups.add(option_group)
+                processed_options.add(option)
+
+                gcode += f"{command_keyword}{option.value}"
+
+    if processed_options != set(options):
+        raise ValueError("Unknown Options Given!")
+
+    return gcode
+
+
+def move(motion_mode: MotionMode=MotionMode.USE_FEEDRATE, 
+        distance_mode: DistanceMode=None, 
+        unit_mode: UnitMode=None,
+        feedrate: Optional[int]=None, 
+        comment: Optional[str]=None,
+        **coordinates) -> str:
     '''
     generates movement Gxx gcode commands according to inputs
 
-    :coordinate_mode: based on CoordMode Enum which specifies whether coordinate argument are INCREMENTAL or ABSOLUTE values
+    :distance_mode: based on DistanceMode Enum which specifies whether coordinate argument are INCREMENTAL or ABSOLUTE values
     :param feedrate: will be inserted to line if wanted
     :param use_00: use G00 to move as fast as possible without looking at current feedrate
     :param comment: add comment after gcode line
     :param **coordinates: must input either coordinate=[x, y] or one of x=int, y=int, z=int or a combination of those three
     :return: return Gxx movement gcode command as string
     '''
+    gcode = ""
 
-    if coordinate_mode == CoordMode.ABSOLUTE:
-        if use_00:
-            gcode = 'G00'
-        else:
-            gcode = 'G01 '
-    elif coordinate_mode == CoordMode.INCREMENTAL:
-        if use_00:
-            gcode = 'G21G91G00'
-        else:
-            gcode = 'G21G91G01'
+    if unit_mode:
+        gcode += f"G{unit_mode}"
 
+    if distance_mode:
+        gcode += f"G{distance_mode}"
+
+    gcode += f"G{motion_mode}"
+
+    # Target Coordinates
     gcode += get_coordinate_from_kwargs(coordinates)
 
+    # Feedrate
     if feedrate:
         gcode += f"F{feedrate}"
+
+    # Comment
     if comment:
         gcode += f" ; {comment}"
 
+    # EOL
     gcode += '\n'
     
-    if coordinate_mode == CoordMode.INCREMENTAL:
-        gcode += 'G21G90\n'  #get it back to absolute
-
     return gcode
 
 
@@ -327,18 +413,18 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
 
             ### Go get the tool
             # go to tool coordinate but male latch is just outside the female latch
-            gcode += move(CoordMode.ABSOLUTE, use_00=True, comment=f'Go to Tool-{wanted_tool.value} Home Pos', coordinate=tool_home_coordinate)
+            gcode += move(motion_mode=MotionMode.RAPID, comment=f'Go to Tool-{wanted_tool.value} Home Pos', coordinate=tool_home_coordinate)
             # Now male latch inside female latch, using incremental gcode
-            gcode += move(CoordMode.ABSOLUTE,  use_00=True, comment='Enter Female Kinematic Mount Home Pos', x=latch_offset_distance_in)
+            gcode += move( motion_mode=MotionMode.RAPID, comment='Enter Female Kinematic Mount Home Pos', x=latch_offset_distance_in)
             # now male latch twisting and locking on
             gcode += f"A1 ; Latch on Kinematic Mount\n"  
             # Wait until male latch is fully locked on
             gcode += f"G4 P{attach_detach_time} ; Wait for Kinematic Mount to fully attach\n"  
             # now pull off the female kinematch mount off its hanger, using incremental gcode
-            gcode += move(CoordMode.ABSOLUTE,  use_00=True, comment='Exit Female Kinematic Mount Home Pos', x=latch_offset_distance_out)
+            gcode += move( motion_mode=MotionMode.RAPID, comment='Exit Female Kinematic Mount Home Pos', x=latch_offset_distance_out)
 
             ### Fixing Current Point according the new tool head
-            gcode += set_grbl_coordinate(CoordMode.INCREMENTAL, comment=' ;Add tool offset coordinate', coordinate=tool_offset)
+            gcode += set_grbl_coordinate(DistanceMode.INCREMENTAL, comment=' ;Add tool offset coordinate', coordinate=tool_offset)
 
             ### Activate it by sending the corresponding tool number in the multiplexer
             gcode += f'C{wanted_tool.value} ; Choosing tool {wanted_tool.value} in the choose demultiplexer circuits\n'
@@ -352,19 +438,19 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
 
             ### Overide current coordinate to go to tool home pos relative to origin by inversing the tool_offset
             tool_offset = Point(tool_offset.x*-1, tool_offset.y*-1, tool_offset.z*-1)
-            gcode += set_grbl_coordinate(CoordMode.INCREMENTAL, comment=' ;Remove tool offset coordinate', coordinate=tool_offset)
+            gcode += set_grbl_coordinate(DistanceMode.INCREMENTAL, comment=' ;Remove tool offset coordinate', coordinate=tool_offset)
 
             ### Deactivate it by selecting the empty tool in the multiplexer
             # go to tool coordinate but male latch is just outside the female latch
-            gcode += move(CoordMode.ABSOLUTE, use_00=True, comment=f'Go to Tool-{wanted_tool.value} Home Pos', coordinate=tool_home_coordinate)
+            gcode += move(motion_mode=MotionMode.RAPID, comment=f'Go to Tool-{wanted_tool.value} Home Pos', coordinate=tool_home_coordinate)
             # Put the tool back to it's hanger
-            gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Enter Female Kinematic Mount Home Pos', x=latch_offset_distance_out)
+            gcode += move(motion_mode=MotionMode.RAPID, comment='Enter Female Kinematic Mount Home Pos', x=latch_offset_distance_out)
             # male latch untwisting from female latch and locking off
             gcode += f"A0 ; Latch OFF Kinematic Mount\n" 
             # Wait until male latch is fully locked off
             gcode += f"G4 P{attach_detach_time} ; Wait for Kinematic Mount to fully detach\n"
             # Now pull off the male kinematic mount away from the female kinematic mount
-            gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Exit Female Kinematic Mount Home Pos', x=latch_offset_distance_in)
+            gcode += move(motion_mode=MotionMode.RAPID, comment='Exit Female Kinematic Mount Home Pos', x=latch_offset_distance_in)
 
         else:
             raise ValueError("Mode unknown")
@@ -408,7 +494,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     gcode += f'S{spindle_speed} ; sets pwm speed when we enable it\n\n'
 
     # Moving Motor to proper up Z position and home position
-    gcode += move(CoordMode.ABSOLUTE, comment="Moving Spindle to UP Postion", z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
+    gcode += move(comment="Moving Spindle to UP Postion", z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
     gcode += '\n'
 
     # Turn the DC motor on and wait two seconds
@@ -421,9 +507,9 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
     coordinates = get_holes_coords(gerber_obj, debug=debug)
 
     for coordinate in coordinates:
-        gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate, feedrate=feedrate_XY)
-        gcode += move(CoordMode.ABSOLUTE, z=motor_down_z_position, feedrate=feedrate_Z_drilling)
-        gcode += move(CoordMode.ABSOLUTE, z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
+        gcode += move(coordinate=coordinate, feedrate=feedrate_XY)
+        gcode += move(z=motor_down_z_position, feedrate=feedrate_Z_drilling)
+        gcode += move(z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
     gcode += '\n'
 
     # deactivating the tool PWM
@@ -518,7 +604,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
 #    gcode += f'F{feedrate} ; setting default feedrate for ink laying\n\n'
 
 #    # Go to starting position
-#    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='; Go to ink laying starting position', x=x_start_pos, y=y_start_pos, z=pen_down_position)
+#    gcode += move(motion_mode=MotionMode.RAPID, comment='; Go to ink laying starting position', x=x_start_pos, y=y_start_pos, z=pen_down_position)
 
 #    # Execute the MAIN Gcode
 #    current_x_dict = {False: x_start_pos, True: x_end_pos}
@@ -529,12 +615,12 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, m
 #        current_x = current_x_dict[current_x_ind]
 #        current_y += y_increment
 
-#        gcode += move(CoordMode.ABSOLUTE, x=current_x)
-#        gcode += move(CoordMode.ABSOLUTE, y=current_y)
+#        gcode += move(x=current_x)
+#        gcode += move(y=current_y)
 #    gcode += '\n'
 
 #    # Get tool away from PCB in Z position
-#    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Get away from PCB in Z axis\n', z=0)
+#    gcode += move(motion_mode=MotionMode.RAPID, comment='Get away from PCB in Z axis\n', z=0)
 
 #    # Deactivate End Effector Signal
 #    gcode += f'M5 ; Disable End-Effector Signal\n\n'
@@ -558,8 +644,7 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, s
     gcode += '\n; PCB trace laser engraving Gcode\n\n'
 
     # Setting GRBL mode to laser mode
-    #TODO: check first if it's not already set, Saving EEPROM with every run will wear it out with time
-    # gcode += "$32=1 ; Setting GRBL mode to laser mode\n\n"
+    gcode += "; Please Check $32 is equal to 1 for Laser Mode\n\n"
 
     # Activiate Tool number 1, The Laser Module
     if settings.tool:
@@ -569,7 +654,7 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, s
     gcode += f'F{settings.feedrate} ; setting default feedrate\n\n'
 
     # Setting the Optimum focal distance by moving the Z position in the correct coordinate
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Moving to correct focal length Z position\n', z=settings.optimum_focal_distance)
+    gcode += move(motion_mode=MotionMode.RAPID, comment='Moving to correct focal length Z position\n', z=settings.optimum_focal_distance)
 
     # Setting the correct laser Power
     gcode += f"S{settings.laser_power} ; Setting Laser Power\n\n"
@@ -584,13 +669,13 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, s
         gcode += f'; Pass number: {settings.pass_num+1}\n'
 
         for coordinate_list in coordinate_lists:
-            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
+            gcode += move(coordinate=coordinate_list[0])
             gcode += "M3\n"
 
             for coordinate in coordinate_list[1:]:
-                gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate)
+                gcode += move(coordinate=coordinate)
 
-            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])  #TODO: ??!??!?! what is this ???!?!
+            gcode += move(coordinate=coordinate_list[0])  #TODO: ??!??!?! what is this ???!?!
             gcode += "M5\n"
 
     gcode += '\n'
@@ -611,34 +696,36 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
 
     :return: This function creates the gcode content as string according to the input coordinates
     '''
-    # Preparations
-    if settings.height_map:
-        with open(settings.height_map, 'r') as f:
-            height_map = json.load(f)
-    else:
-        height_map = None
-
     gcode = ''
 
     gcode += '\n; Spindle trace laser engraving Gcode\n\n'
 
     # Setting GRBL mode to spindle mode
-    #TODO: check first if it's not already set, Saving EEPROM with every run will wear it out with time
-    # gcode += "$32=0 ; Setting GRBL mode to spindle mode\n\n"
+    gcode += "; Please Check $32 is equal to 0 for Spindle Mode\n\n"
 
     #TODO: add bit change code here
     if settings.tool:
         # Activiate Tool number 1, The Laser Module
         gcode += tool(ToolChange.Select, settings.Tool.Laser)
-    
-    # Making sure spindle is at Up position
-    gcode += move(CoordMode.ABSOLUTE, use_00=True, comment='Making Sure Spindle is Up position', z=settings.spindle_Z_up_position)
 
+    # Making sure Modal Group settings are correct
+    set_options(MotionMode.USE_FEEDRATE, 
+            DistanceMode.ABSOLUTE, 
+            UnitMode.MM, 
+            PlaneSelect.XY, 
+            FeedRateMode.UNIT_PER_MIN)
+    
     #  Starting Spindle and Setting the correct spindle speed
     gcode += f"M3S{settings.spindle_speed} ; Spindle On and Setting spindle Speed\n\n"
 
     # getting the list of list of path coords :D
     # The bulk of the code is in this single line ;)
+    # Preparing Height Map
+    if settings.height_map:
+        with open(settings.height_map, 'r') as f:
+            height_map = json.load(f)
+    else:
+        height_map = None
     coordinate_lists = get_traces_outlines(
             gerber_obj, 
             settings.include_edge_cuts, 
@@ -652,25 +739,25 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
         gcode += f"; Engraving Trace No. {ind}\n"
 
         # Go to start of Loop
-        gcode += move(CoordMode.ABSOLUTE, use_00=True, coordinate=Point(coordinate_list[0].x,
+        gcode += move(motion_mode=MotionMode.RAPID, coordinate=Point(coordinate_list[0].x,
                                                                     coordinate_list[0].y,
                                                                     settings.spindle_Z_up_position))
 
         # Spindle Down, Start engraving
-        gcode += move(CoordMode.ABSOLUTE, Z=coordinate_list[0].z, feedrate=settings.spindle_feedrate_Z_engrave)
+        gcode += move(Z=coordinate_list[0].z, feedrate=settings.spindle_feedrate_Z_engrave)
 
         # Setting engraving feedrate
         gcode += f'F{settings.spindle_feedrate_XY_engrave} ; setting default feedrate\n'
 
         # Continue Loop
         for coordinate in coordinate_list[1:]:
-            gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate)
+            gcode += move(coordinate=coordinate)
 
         # Complete the Loop
-        gcode += move(CoordMode.ABSOLUTE, coordinate=coordinate_list[0])
+        gcode += move(coordinate=coordinate_list[0])
 
         # Spindle Up, Stop engraving
-        gcode += move(CoordMode.ABSOLUTE, Z=settings.spindle_Z_up_position, feedrate=settings.spindle_feedrate_Z_up)
+        gcode += move(Z=settings.spindle_Z_up_position, feedrate=settings.spindle_feedrate_Z_up)
 
         gcode += '\n'
 
@@ -729,11 +816,11 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
             raise ValueError("grbl not responsive!")
 
         for ind, coord in enumerate(height_map):
-            ser.write(move(CoordMode.ABSOLUTE, use_00=True, x=coord[0], y=coord[1], z=1).encode())
+            ser.write(move(=True, x=coord[0], y=coord[1], z=1).encode())
             confirmation = ser.readline()
             if confirmation != 'ok':
                 raise ValueError("Didn't receive 'ok' after sending gcode")
-            ser.write(b'G91G98.2Z-2F10')
+            ser.write(b'G91G38.2Z-2F10')
             probe_value = ser.readline()
             #TODO: use regex to get z probe value, deal with wrong response or alarm
             
@@ -741,6 +828,7 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
 
     # convert to tuple and return
     return ((coord[0], coord[1], coord[2]) for coord in height_map)
+
 
 if __name__ == '__main__':
 
