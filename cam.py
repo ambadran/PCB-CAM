@@ -923,7 +923,6 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
     for coord_list_ind, coord_list in enumerate(coord_list_list):
         for coord_ind, coord in enumerate(coord_list):
                 coord_list_list[coord_list_ind][coord_ind] = Point(coord.x, coord.y, get_z(coord.x, coord.y)[0])
-                print(coord_list_list[coord_list_ind][coord_ind])
 
     # Visualizing the traces
     if debug:

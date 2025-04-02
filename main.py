@@ -99,8 +99,8 @@ def main(settings: Settings):
     gcode = ""
     debug_msg = f"\n\nPCB Dimension Width: {gerber_obj.size[0]}, Height: {gerber_obj.size[1]}.\n\n"
 
-    # Machine Init
     gcode += general_machine_init()
+    gcode += f"\n; PCB Dimension Width: {gerber_obj.size[0]}, Height: {gerber_obj.size[1]}.\n"
 
     ### DEPRECATED ###
     # # Creating the PCB ink laying Gcode

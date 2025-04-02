@@ -43,8 +43,8 @@ def addArg(name: str, help_str: str, var_type, one_letter: Optional[str]=None, t
                     nargs="?",
                     const=default_settings_dict[name], # default value if --name is provided
                     default=None, # default value if --name is not provided
-                    help=help_str
-                    )
+                    help=help_str)
+
         else:
             parser.add_argument(
                     f"--{cli_name}", 
@@ -52,9 +52,8 @@ def addArg(name: str, help_str: str, var_type, one_letter: Optional[str]=None, t
                     nargs="?",
                     const=default_settings_dict[name], # default value if --name is provided
                     default=None, # default value if --name is not provided
-                    help=help_str
-                    )
- 
+                    help=help_str)
+        return parser
 
     if var_type != bool:
         if one_letter:
