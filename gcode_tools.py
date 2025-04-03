@@ -875,8 +875,15 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
                            feedrate=10).encode())
 
             # Step4: Process Probe response
-            probe_value = ser.readline()
-            #TODO: use regex to get z probe value, deal with wrong response or alarm
+            probe_value_response = ser.readline()
+            while probe_value_response != 'ok':
+                # ignoring other command confirmations
+                probe_value_response = ser.readline()
+            matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
+            if matches:
+                probe_value = float(matches[0][2])
+            else:
+                raise ValueError("Couldn't regex match the probe string!!")
             
             # Step 5: Save height map value :D
             height_map[ind][2] = probe_value  # finally, skeywordet the probe Z value
