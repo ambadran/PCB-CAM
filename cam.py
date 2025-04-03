@@ -21,7 +21,6 @@ import math
 import numpy as np
 from scipy.interpolate import interp2d
 import tkinter as tk
-import serial
 
 # Screen Dimensions
 def get_screen_width_height() -> tuple[int, int]:

@@ -4,6 +4,7 @@ PCB CAM program
 My custom Gcode Generator :)))
 '''
 import warnings
+import json
 with warnings.catch_warnings():
     # suppressing a stupid syntax warning to convert 'is not' to '!='
     warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -81,7 +82,7 @@ def main(settings: Settings):
     # height_map mode
     if settings.create_height_map:
         height_map = generate_height_map(gerber_obj, settings)
-        
+
         dir_path = os.path.dirname(settings.src)
         dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
         with open(dir_path_with_slash+settings.created_height_map_default_file_name, "w") as f:

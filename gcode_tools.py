@@ -5,13 +5,13 @@ from enum import Enum
 from typing import Callable, Optional
 from math import floor, ceil
 import re
-
+from contextlib import contextmanager
+import serial
 import warnings
 with warnings.catch_warnings():
     # suppressing a stupid syntax warning to convert 'is not' to '!='
     warnings.filterwarnings("ignore", category=SyntaxWarning)
     import gerber
-
 from cam import get_traces_outlines, get_holes_coords, get_pen_coords, Point
 
 def get_max_decimal_place(value: float) -> int:
@@ -818,6 +818,18 @@ def export_gcode(gcode: str, file_name: str) -> None:
     with open(file_name, 'w') as g_file:
         g_file.write(gcode)
 
+@contextmanager
+def temp_timeout(ser, timeout: int):
+    '''
+    applies a timeout to some serial code then return to default timeout automagically :)
+    '''
+    old_timeout = ser.timeout
+    ser.timeout = timeout
+    try:
+        yeild
+    finally:
+        ser.timeout = old_timeout
+
 def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple[tuple[float, float, float]]:
     '''
     :param resolution: resolution of height map in mm; take measurements every how much mm
@@ -827,30 +839,38 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
     # Making sure initial state is known
     user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\n\nConfirm (y/n): ").lower()
     if user_in == 'n':
-        print("Aborting..")
-        return None
+        raise ValueError("Aborting Execution due to User input..")
     elif user_in not in ['y', 'yes']:
-        print("Unknown answer.")
-        return None
+        raise ValueError("Unknown answer.")
     print()
 
     # creating the height map waypoints the probe will travel to
     height_map = []
     x_size = gerber_obj.size[0]  # max pcb length in mm
     y_size = gerber_obj.size[1]  # max pcb width in mm
-    for x in range(0, ceil(x_size), resolution):
-        for y in range(0, ceil(y_size), resolution):
+    for x in range(0, ceil(x_size), settings.height_map_resolution):
+        for y in range(0, ceil(y_size), settings.height_map_resolution):
             height_map.append([x, y, 0])
     height_map.append([ceil(x_size), ceil(y_size)])  # Making sure not out of bound coords can be passed to interpolation function
 
     # establishing connection
-    with serial.Serial(settings.serial_port, settings.serial_baud) as ser:
+    with serial.Serial(settings.serial_port, settings.serial_baud, timeout=2) as ser:
+
+        # reading the greeting grbl message first
+        response = ser.readline().decode()
+        response += ser.readline().decode()
+        if 'grbl' not in response.lower():
+            raise ValueError("Expected Grbl Greeting Message Upon connection!")
+        else:
+            print("\nEstablished Successful Connection to GRBL Device!\n")
 
         # Check grbl device responsive
         ser.write(b'\n')
-        response = ser.readline()
+        response = ser.readline().decode()
         if 'ok' not in response:
-            raise ValueError("grbl not responsive!")
+            raise ValueError(f"grbl wrong response to Enter!\nResponse: {response}")
+        else:
+            print("GRBL Responsiveness test Successful!\n\n")
 
         for ind, coord in enumerate(height_map):
 
@@ -863,27 +883,30 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
                 x=coord[0], y=coord[1]).encode())
 
             # Step2: Confirm Command is received
-            confirmation = ser.readline()
-            if confirmation != 'ok':
+            confirmation = ser.readline().decode()
+            confirmation += ser.readline().decode()
+            if 'ok' not in confirmation:
                 raise ValueError("Didn't receive 'ok' after sending gcode")
+            else:
+                print(f"Getting Probe Value at Coord({coord[0]}, {coord[1]}) -> ({ind}/{len(height_map)})")
 
             # Step3: Send Probe Command
-            ser.write(b'G91G38.2Z-2F10')
             ser.write(move(MotionMode.PROBE_TOWARD_ERROR, 
                            DistanceMode.INCREMENTAL,
                            z=-2,
                            feedrate=10).encode())
 
             # Step4: Process Probe response
-            probe_value_response = ser.readline()
-            while probe_value_response != 'ok':
-                # ignoring other command confirmations
-                probe_value_response = ser.readline()
+            probe_value_response = ser.readline().decode()
+            while 'PRB' not in probe_value_response:
+                probe_value_response = ser.readline().decode()
+                if ''
             matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
             if matches:
                 probe_value = float(matches[0][2])
+                print(f"Got Probe Value: {probe_value}!\n")
             else:
-                raise ValueError("Couldn't regex match the probe string!!")
+                raise ValueError(f"Couldn't regex match the probe string!!\nProbe String from Grbl: {probe_value_response}")
             
             # Step 5: Save height map value :D
             height_map[ind][2] = probe_value  # finally, skeywordet the probe Z value
@@ -972,6 +995,5 @@ if __name__ == '__main__':
 
     # # exporting the created Gcode
     # export_gcode(gcode, new_file_name)
-
 
 
