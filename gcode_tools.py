@@ -7,6 +7,7 @@ from math import floor, ceil
 import re
 from contextlib import contextmanager
 import serial
+from dataclasses import dataclass
 import warnings
 with warnings.catch_warnings():
     # suppressing a stupid syntax warning to convert 'is not' to '!='
@@ -830,32 +831,66 @@ def temp_timeout(ser, timeout: int):
     finally:
         ser.timeout = old_timeout
 
-def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple[tuple[float, float, float]]:
+@dataclass
+class Offset:
+    x: float
+    y: float
+    z: float
+
+class GenerateHeightMap:
     '''
-    :param resolution: resolution of height map in mm; take measurements every how much mm
-
-    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
+    Object to handle all the sending and receiving to grbl to get the height map!
     '''
-    # Making sure initial state is known
-    user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\nASSUMING PROBE IS ATTACHED TO BIT!\n\nConfirm (y/n): ").lower()
-    if user_in == 'n':
-        raise ValueError("Aborting Execution due to User input..")
-    elif user_in not in ['y', 'yes']:
-        raise ValueError("Unknown answer.")
-    print()
+    def __init__(self, gerber_obj: gerber.rs274x.GerberFile, settings):
+        '''
+        Main Routine to generate the height map
+        '''
+        ### Creating some essential attributes
+        self.gerber_obj = gerber_obj
+        self.settings = settings
+        self.height_map = self.generate_height_map_datastructure()
+        
+        ### Starting the Sequence
+        self.check_user_is_ready()
 
-    # creating the height map waypoints the probe will travel to
-    height_map = []
-    x_size = gerber_obj.size[0]  # max pcb length in mm
-    y_size = gerber_obj.size[1]  # max pcb width in mm
-    for x in range(0, ceil(x_size), settings.height_map_resolution):
-        for y in range(0, ceil(y_size), settings.height_map_resolution):
-            height_map.append([x, y, 0])
-    height_map.append([ceil(x_size), ceil(y_size), 0])  # Making sure not out of bound coords can be passed to interpolation function
+        # Establishing Connection
+        with serial.Serial(self.settings.serial_port, self.settings.serial_baud, timeout=2) as ser:
+            self.read_grbl_initial_msg(ser)
+            self.g54_offset, self.g92_offset = self.get_grbl_g54_g92_offsets(ser)
+            #TODO: Make sure we are on the G54 offset
 
-    # establishing connection
-    with serial.Serial(settings.serial_port, settings.serial_baud, timeout=2) as ser:
+            # start cycling through the points and probe
+            for ind, coord in enumerate(self.height_map):
 
+
+    def check_user_is_ready(self):
+        '''
+        Checks if user has the ASSUMPTIONS CORRECT
+        '''
+        user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\nASSUMING PROBE IS ATTACHED TO BIT!\n\nConfirm (y/n): ").lower()
+        if user_in == 'n':
+            raise ValueError("Aborting Execution due to User input..")
+        elif user_in not in ['y', 'yes']:
+            raise ValueError("Unknown answer.")
+        print()
+
+    def generate_height_map_datastructure(self) --> list[list[float, float, float]]:
+        '''
+        generate the datastructure of the height map
+        '''
+        height_map = []
+        x_size = self.gerber_obj.size[0]  # max pcb length in mm
+        y_size = self.gerber_obj.size[1]  # max pcb width in mm
+        for x in range(0, ceil(x_size), self.settings.height_map_resolution):
+            for y in range(0, ceil(y_size), self.settings.height_map_resolution):
+                height_map.append([x, y, 0])
+        height_map.append([ceil(x_size), ceil(y_size), 0])  # Making sure not out of bound coords can be passed to interpolation function
+        return height_map
+
+    def read_grbl_initial_msg(self, ser: serial.Serial):
+        '''
+        read the "GrblHAL 1.1f ['$' or '$help' for help]"
+        '''
         # reading the greeting grbl message first
         response = ser.readline().decode()
         response += ser.readline().decode()
@@ -864,14 +899,57 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
         else:
             print("\nEstablished Successful Connection to GRBL Device!\n")
 
-        # Check grbl device responsive
-        ser.write('\n'.encode())
-        response = ser.readline().decode()
-        if 'ok' not in response:
-            raise ValueError(f"grbl wrong response to Enter!\nResponse: {response}")
-        else:
-            print("GRBL Responsiveness test Successful!\n\n")
+    def get_grbl_g54_g92_offsets(self, ser: serial.Serial) -> tuple[Offset, Offset]
+        '''
+         - Check grbl device responsive
+         - use '$#' to check the G54 and G92 offsets
 
+         current absolute coord = machine coord - G54 coord - G92 coord
+         (use '?' to check absolute machine coord)
+        '''
+        # set timeout to 2 seconds as $# shouldn't take any time to respond
+        ser.timeout = 2
+
+        # send the $# command to get all the GRBL offsets
+        ser.write('$#\n'.encode())
+
+        # keep reading until nothing else to read
+        tmp = ser.readline().decode()
+        response = ""
+        response += tmp
+        while tmp != '':
+            tmp = ser.readline().decode()
+            response += tmp
+
+        # extracting the G54 and G92 offsets into the Offset datastructure
+        g54_match = re.search(r"\[G54:([-\d.]+),([-\d.]+),([-\d.]+)\]", response)
+        if g54_match:
+            g54_offset = Offset(
+                    float(g54_match.group(1)),
+                    float(g54_match.group(2)),
+                    float(g54_match.group(3))
+                    )
+        else:
+            raise ValueError(f"Couldn't extract G54 offsets?!\nResponse: {response}")
+
+        g92_match = re.search(r"\[G92:([-\d.]+),([-\d.]+),([-\d.]+)\]", response)
+        if g92_match:
+            g92_offset = Offset(
+                    float(g92_match.group(1)),
+                    float(g92_match.group(2)),
+                    float(g92_match.group(3))
+                    )
+        else:
+            raise ValueError(f"Couldn't extract G92 offsets?!\nResponse: {response}")
+        return g54_offset, g92_offset
+
+
+def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple[tuple[float, float, float]]:
+    '''
+    :param resolution: resolution of height map in mm; take measurements every how much mm
+
+    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
+    '''
         for ind, coord in enumerate(height_map):
 
             # Step 1: Go next height map grid point
