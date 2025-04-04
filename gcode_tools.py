@@ -862,6 +862,44 @@ class GenerateHeightMap:
             # start cycling through the points and probe
             for ind, coord in enumerate(self.height_map):
 
+                # Step 1: Go next height map grid point
+                ser.write(move(MotionMode.RAPID, 
+                    DistanceMode.ABSOLUTE, 
+                    z=1).encode())
+                ser.write(move(MotionMode.RAPID, 
+                    DistanceMode.ABSOLUTE, 
+                    x=coord[0], y=coord[1]).encode())
+
+                # Step2: Confirm Command is received
+                confirmation = ser.readline().decode()
+                confirmation += ser.readline().decode()
+                if 'ok' not in confirmation:
+                    raise ValueError("Didn't receive 'ok' after sending gcode")
+                else:
+                    print(f"Getting Probe Value at Coord({coord[0]}, {coord[1]}) -> ({ind}/{len(self.height_map)-1})")
+
+                # Step3: Send Probe Command
+                ser.write(move(MotionMode.PROBE_TOWARD_ERROR, 
+                               DistanceMode.INCREMENTAL,
+                               z=-2,
+                               feedrate=10).encode())
+
+                # Step4: Process Probe response
+                probe_value_response = ser.readline().decode()
+                while 'PRB' not in probe_value_response:
+                    probe_value_response = ser.readline().decode()
+                    if 'alarm' in probe_value_response.lower():
+                        raise ValueError(f"ALARM detected!!\n{probe_value_response}")
+                matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
+                if matches:
+                    probe_value = float(matches[0][2])
+                    print(f"Got Probe Value: {probe_value}\n")
+                else:
+                    raise ValueError(f"Couldn't regex match the probe string!!\nProbe String from Grbl: {probe_value_response}")
+                
+                # Step 5: Save height map value :D
+                # finally, skeywordet the probe Z value
+                self.height_map[ind][2] = probe_value - self.g54_offset.z - self.g92_offset.z
 
     def check_user_is_ready(self):
         '''
