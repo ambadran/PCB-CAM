@@ -837,7 +837,7 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
     returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
     '''
     # Making sure initial state is known
-    user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\n\nConfirm (y/n): ").lower()
+    user_in = input("\nASSUMING THE GRBL CURRENT WORKING COORDINATE X, Y, Z ORIGIN IS AT ORIGIN OF PCB( (0, 0, 0) of PCB ).\nASSUMING Z=0 IS JUST TOUCHING PCB surface.\nASSUMING PROBE IS ATTACHED TO BIT!\n\nConfirm (y/n): ").lower()
     if user_in == 'n':
         raise ValueError("Aborting Execution due to User input..")
     elif user_in not in ['y', 'yes']:
@@ -851,7 +851,7 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
     for x in range(0, ceil(x_size), settings.height_map_resolution):
         for y in range(0, ceil(y_size), settings.height_map_resolution):
             height_map.append([x, y, 0])
-    height_map.append([ceil(x_size), ceil(y_size)])  # Making sure not out of bound coords can be passed to interpolation function
+    height_map.append([ceil(x_size), ceil(y_size), 0])  # Making sure not out of bound coords can be passed to interpolation function
 
     # establishing connection
     with serial.Serial(settings.serial_port, settings.serial_baud, timeout=2) as ser:
@@ -865,7 +865,7 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
             print("\nEstablished Successful Connection to GRBL Device!\n")
 
         # Check grbl device responsive
-        ser.write(b'\n')
+        ser.write('\n'.encode())
         response = ser.readline().decode()
         if 'ok' not in response:
             raise ValueError(f"grbl wrong response to Enter!\nResponse: {response}")
@@ -888,7 +888,7 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
             if 'ok' not in confirmation:
                 raise ValueError("Didn't receive 'ok' after sending gcode")
             else:
-                print(f"Getting Probe Value at Coord({coord[0]}, {coord[1]}) -> ({ind}/{len(height_map)})")
+                print(f"Getting Probe Value at Coord({coord[0]}, {coord[1]}) -> ({ind}/{len(height_map)-1})")
 
             # Step3: Send Probe Command
             ser.write(move(MotionMode.PROBE_TOWARD_ERROR, 
@@ -900,19 +900,20 @@ def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple
             probe_value_response = ser.readline().decode()
             while 'PRB' not in probe_value_response:
                 probe_value_response = ser.readline().decode()
-                if ''
+                if 'alarm' in probe_value_response.lower():
+                    raise ValueError(f"ALARM detected!!\n{probe_value_response}")
             matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
             if matches:
                 probe_value = float(matches[0][2])
-                print(f"Got Probe Value: {probe_value}!\n")
+                print(f"Got Probe Value: {probe_value}\n")
             else:
                 raise ValueError(f"Couldn't regex match the probe string!!\nProbe String from Grbl: {probe_value_response}")
             
             # Step 5: Save height map value :D
             height_map[ind][2] = probe_value  # finally, skeywordet the probe Z value
 
-    # convert to tuple and return
-    return ((coord[0], coord[1], coord[2]) for coord in height_map)
+    # no need to convert to tuple as it will be saved in a json file which doesn't support tuple
+    return height_map
 
 
 if __name__ == '__main__':
