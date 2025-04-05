@@ -79,9 +79,9 @@ def main(settings: Settings):
     if settings.rotated:
         gerber_obj.rotate_90()
 
-    # height_map mode
+    # Create height_map mode
     if settings.create_height_map:
-        height_map = generate_height_map(gerber_obj, settings)
+        height_map = GenerateHeightMap(gerber_obj, settings).height_map
 
         dir_path = os.path.dirname(settings.src)
         dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
@@ -93,7 +93,12 @@ def main(settings: Settings):
     # Saving New Gerber File
     if not settings.dont_export_gbr:
         dir_path = os.path.dirname(settings.src)
-        dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
+        if dir_path and dir_path.endswith('/'):
+            dir_path_with_slash = dir_path
+        elif dir_path:
+            dir_path_with_slash = dir_path + '/'
+        else:
+            dir_path_with_slash = dir_path
         gerber_obj.write(dir_path_with_slash + settings.new_gbr_name)
 
     ### Creating the Gcode file

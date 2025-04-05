@@ -908,10 +908,10 @@ def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile,
         y_coords = sorted({point[1] for point in height_map})
         z_grid = np.zeros((len(y_coords), len(x_coords)))
         for point in height_map:
-            x, y, Z_offset_from_0 = point
+            x, y, z = point
             i = y_coords.index(y)
             j = x_coords.index(x)
-            z_grid[i, j] = z
+            z_grid[i, j] = z+Z_offset_from_0
         # get the interpolate function 
         get_z = interp2d(x_coords, y_coords, z_grid, kind='linear')
 

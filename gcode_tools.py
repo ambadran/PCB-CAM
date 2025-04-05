@@ -8,6 +8,7 @@ import re
 from contextlib import contextmanager
 import serial
 from dataclasses import dataclass
+import json
 import warnings
 with warnings.catch_warnings():
     # suppressing a stupid syntax warning to convert 'is not' to '!='
@@ -735,6 +736,11 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     # Setting GRBL mode to spindle mode
     gcode += "; Please Check $32 is equal to 0 for Spindle Mode\n\n"
 
+    #  Starting Spindle and Setting the correct spindle speed
+    gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
+            feedrate=settings.spindle_feedrate_XY_engrave,
+            comment="Settings Non Modal Groups\n")
+
     # Making sure Modal Group settings are correct
     gcode += set_modal_options(MotionMode.USE_FEEDRATE, 
             DistanceMode.ABSOLUTE, 
@@ -743,11 +749,6 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
             FeedRateMode.UNIT_PER_MIN,
             comment="Setting Modal Groups")
     
-    #  Starting Spindle and Setting the correct spindle speed
-    gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
-            feedrate=settings.spindle_feedrate_XY_engrave,
-            comment="Settings Non Modal Groups\n")
-
     #TODO: add bit change code here
     if settings.tool:
         # Activiate Tool number 1, The Laser Module
@@ -768,6 +769,9 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
             height_map=height_map, 
             Z_offset_from_0=settings.spindle_Z_down_engrave,
             debug=settings.debug)
+
+    # Activate Spindle
+    gcode += f'\nG00Z3\nM3 ; Activate Spindle\n\n'
 
     ### PCB trace engraving Gcode
     for ind, coordinate_list in enumerate(coordinate_lists):
@@ -890,14 +894,19 @@ class GenerateHeightMap:
                         raise ValueError(f"ALARM detected!!\n{probe_value_response}")
                 matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
                 if matches:
-                    probe_value = float(matches[0][2])
+                    probe_value = round(float(matches[0][2]) - self.g54_offset.z - self.g92_offset.z, 4)
                     print(f"Got Probe Value: {probe_value}\n")
                 else:
                     raise ValueError(f"Couldn't regex match the probe string!!\nProbe String from Grbl: {probe_value_response}")
                 
                 # Step 5: Save height map value :D
                 # finally, skeywordet the probe Z value
-                self.height_map[ind][2] = probe_value - self.g54_offset.z - self.g92_offset.z
+                self.height_map[ind][2] = probe_value 
+        
+            # Go back to ORIGIN
+            ser.write(move(MotionMode.RAPID,
+                           DistanceMode.ABSOLUTE,
+                           x = 0, y = 0, z = 2).encode())
 
     def check_user_is_ready(self):
         '''
@@ -977,6 +986,8 @@ class GenerateHeightMap:
                     )
         else:
             raise ValueError(f"Couldn't extract G92 offsets?!\nResponse: {response}")
+
+        print(f"G54 Offset: {g54_offset}\nG92 Offset: {g92_offset}\n")
         return g54_offset, g92_offset
 
 if __name__ == '__main__':

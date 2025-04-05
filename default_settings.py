@@ -31,12 +31,12 @@ default_settings_dict = {
     ### spindle tweaking values
     # Z positions
     "spindle_Z_up_position": 1,
-    "spindle_Z_down_engrave": 0.1,
+    "spindle_Z_down_engrave": 0.02,
     "spindle_Z_down_hole": 2,
     # Feedrates
-    "spindle_feedrate_XY_engrave": 300,
+    "spindle_feedrate_XY_engrave": 200,
     "spindle_feedrate_XY_hole": 600,
-    "spindle_feedrate_Z_engrave": 10,
+    "spindle_feedrate_Z_engrave": 30,
     "spindle_feedrate_Z_hole": 50,
     "spindle_feedrate_Z_up": 100,
     # Power intensities
