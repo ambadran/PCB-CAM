@@ -859,9 +859,7 @@ class GenerateHeightMap:
             self.g54_offset, self.g92_offset = self.get_grbl_g54_g92_offsets(ser)
             #TODO: Make sure we are on the G54 offset
 
-            # start cycling through the points and probe
             for ind, coord in enumerate(self.height_map):
-
                 # Step 1: Go next height map grid point
                 ser.write(move(MotionMode.RAPID, 
                     DistanceMode.ABSOLUTE, 
@@ -912,7 +910,7 @@ class GenerateHeightMap:
             raise ValueError("Unknown answer.")
         print()
 
-    def generate_height_map_datastructure(self) --> list[list[float, float, float]]:
+    def generate_height_map_datastructure(self) -> list[list[float, float, float]]:
         '''
         generate the datastructure of the height map
         '''
@@ -937,7 +935,7 @@ class GenerateHeightMap:
         else:
             print("\nEstablished Successful Connection to GRBL Device!\n")
 
-    def get_grbl_g54_g92_offsets(self, ser: serial.Serial) -> tuple[Offset, Offset]
+    def get_grbl_g54_g92_offsets(self, ser: serial.Serial) -> tuple[Offset, Offset]:
         '''
          - Check grbl device responsive
          - use '$#' to check the G54 and G92 offsets
@@ -980,57 +978,6 @@ class GenerateHeightMap:
         else:
             raise ValueError(f"Couldn't extract G92 offsets?!\nResponse: {response}")
         return g54_offset, g92_offset
-
-
-def generate_height_map(gerber_obj: gerber.rs274x.GerberFile, settings) -> tuple[tuple[float, float, float]]:
-    '''
-    :param resolution: resolution of height map in mm; take measurements every how much mm
-
-    returns a tuple of tuple of 3 floats representing the x, y, z coordinates of Z height mapping
-    '''
-        for ind, coord in enumerate(height_map):
-
-            # Step 1: Go next height map grid point
-            ser.write(move(MotionMode.RAPID, 
-                DistanceMode.ABSOLUTE, 
-                z=1).encode())
-            ser.write(move(MotionMode.RAPID, 
-                DistanceMode.ABSOLUTE, 
-                x=coord[0], y=coord[1]).encode())
-
-            # Step2: Confirm Command is received
-            confirmation = ser.readline().decode()
-            confirmation += ser.readline().decode()
-            if 'ok' not in confirmation:
-                raise ValueError("Didn't receive 'ok' after sending gcode")
-            else:
-                print(f"Getting Probe Value at Coord({coord[0]}, {coord[1]}) -> ({ind}/{len(height_map)-1})")
-
-            # Step3: Send Probe Command
-            ser.write(move(MotionMode.PROBE_TOWARD_ERROR, 
-                           DistanceMode.INCREMENTAL,
-                           z=-2,
-                           feedrate=10).encode())
-
-            # Step4: Process Probe response
-            probe_value_response = ser.readline().decode()
-            while 'PRB' not in probe_value_response:
-                probe_value_response = ser.readline().decode()
-                if 'alarm' in probe_value_response.lower():
-                    raise ValueError(f"ALARM detected!!\n{probe_value_response}")
-            matches = re.findall(r"\[PRB:([^,]+),([^,]+),([^,:]+)", probe_value_response)
-            if matches:
-                probe_value = float(matches[0][2])
-                print(f"Got Probe Value: {probe_value}\n")
-            else:
-                raise ValueError(f"Couldn't regex match the probe string!!\nProbe String from Grbl: {probe_value_response}")
-            
-            # Step 5: Save height map value :D
-            height_map[ind][2] = probe_value  # finally, skeywordet the probe Z value
-
-    # no need to convert to tuple as it will be saved in a json file which doesn't support tuple
-    return height_map
-
 
 if __name__ == '__main__':
 
