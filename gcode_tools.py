@@ -288,8 +288,8 @@ def general_machine_deinit() -> str:
     '''
     gcode = ''
     gcode += '; Machine deinitialization Sequence... \n'
-    gcode += move(MotionMode.RAPID, coordinate=Point(0, 0, 0))
-    gcode += 'B0 ; Turn Machine OFF\n'
+    gcode += move(MotionMode.RAPID, coordinate=Point(0, 0, 2))
+    # gcode += 'B0 ; Turn Machine OFF\n'
 
     return gcode
 
@@ -361,14 +361,7 @@ def set_non_modal_options(**options) -> str:
 
     return gcode
 
-#TODO: develop this
 def move(*modal_options, **non_modal_options_and_coordinates) -> str:
-# def move(motion_mode: MotionMode=MotionMode.USE_FEEDRATE, 
-#         distance_mode: DistanceMode=None, 
-#         unit_mode: UnitMode=None,
-#         feedrate: Optional[int]=None, 
-#         comment: Optional[str]=None,
-#         **coordinates) -> str:
     '''
     generates movement Gxx gcode commands according to inputs
 
@@ -399,6 +392,13 @@ def move(*modal_options, **non_modal_options_and_coordinates) -> str:
     gcode += '\n'
     
     return gcode
+
+
+def dwell(seconds: int, comment: Optional[str]=None) -> str:
+    '''
+    returns Gcode to dwell, (sleep for a specific amounts of seconds)
+    '''
+    return f"G4 P{seconds}  ; {comment}"
 
 
 def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int, tool_home_coordinates: dict[int: tuple[int, int, int]], tool_offsets: dict[int: tuple[int, int, int]], attach_detach_time: int) -> Callable:
@@ -494,55 +494,55 @@ def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int,
     return tool
 
 
-def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, tool: Callable, motor_up_z_position: int, 
-        motor_down_z_position: int, feedrate_XY: int, feedrate_Z_drilling: int, feedrate_Z_up_from_pcb: int, 
-        spindle_speed: int, debug: bool=False) -> str:
+def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
     '''
     Takes in String gerber file content, identifies the PCB holes and generates the Gcode to drill the holes from begging to end!
 
     :param gerber: Gerber object from the gerber library
-    :param tool: The tool function defined inside the get_tool_func closure function, it generates gcode to select wanted tool
-    :param motor_up_z_position: position the drill bit is not touching the PCB is off a reasonable offset above the PCB
-    :param motor_down_z_position: position the drill bit has completely drilled through the PCB 
-    :param feedrate_XY: integer mm/minute, only for x and y movement
-    :param feedrate_Z: integer mm/minute, only for z movement, which must be much slower for spindle to cut properly
-    :param spindle_speed: rpm of DC motor to drill holes, please note that the value is 0-250, default value is 230 as tested.
-
+    :param settings:
     :return: This function creates the gcode content as string according to the input coordinates
     '''
+    ### Preparations
+    #TODO: fix this line to return the coordinates using the python gerber library. I am still not sure how to extract componentPad coords
+    coordinates = get_holes_coords(gerber_obj, debug=settings.debug)
+
+    ### Gcode
     gcode = ''
 
-    gcode += '\n; The following gcode is the PCB holes drill gcode\n\n'
+    gcode += '\n; PCB hole drilling Gcode\n\n'
 
-    # Activiate Tool number 2, The Spindle
-    if tool:
-        gcode += tool(ToolChange.Select, Tool.Spindle) 
+    #  Starting Spindle and Setting the correct spindle speed
+    gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
+            feedrate=settings.spindle_feedrate_Z_hole,
+            comment="Settings Non Modal Groups\n")
 
-    # Setting XY movement feedrate
-    gcode += f'F{feedrate_XY} ; setting default feedrate\n\n'
+    # Making sure Modal Group settings are correct
+    gcode += set_modal_options(MotionMode.USE_FEEDRATE, 
+            DistanceMode.ABSOLUTE, 
+            UnitMode.MM, 
+            PlaneSelect.XY, 
+            FeedRateMode.UNIT_PER_MIN,
+            comment="Setting Modal Groups")
 
-    # setting the S value which sets pwm speed when we enable it, 
-    if spindle_speed < 0 or spindle_speed > 256:
-        raise ValueError("spindle_speed is only from 0-250")
-    gcode += f'S{spindle_speed} ; sets pwm speed when we enable it\n\n'
-
-    # Moving Motor to proper up Z position and home position
-    gcode += move(comment="Moving Spindle to UP Postion", z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
+    # Starting Spindle Away from surface
+    gcode += move(MotionMode.RAPID,
+            DistanceMode.ABSOLUTE,
+            Z=2,
+            comment="Going Up from surface to start spindle")
+    gcode += set_modal_options(SpindleState.ON_CW, 
+            comment="Spindle ON CW")
+    gcode += dwell(settings.spindle_dwell_time, comment="dwell for {settings.spindle_dwell_time} seconds so motor reaches full RPM\n")
     gcode += '\n'
 
-    # Turn the DC motor on and wait two seconds
-    gcode += 'M3 ; Turn Motor ON\n'
-    gcode += 'G4 P2 ; dwell for 2 seconds so motor reaches full RPM\n\n'
-
     # Cutting starts here :)
-
-    #TODO: fix this line to return the coordinates using the python gerber library. I am still not sure how to extract componentPad coords
-    coordinates = get_holes_coords(gerber_obj, debug=debug)
-
     for coordinate in coordinates:
-        gcode += move(coordinate=coordinate, feedrate=feedrate_XY)
-        gcode += move(z=motor_down_z_position, feedrate=feedrate_Z_drilling)
-        gcode += move(z=motor_up_z_position, feedrate=feedrate_Z_up_from_pcb)
+        gcode += move(MotionMode.RAPID, 
+                coordinate=coordinate)
+        gcode += move(MotionMode.USE_FEEDRATE,
+                z=settings.spindle_Z_down_hole, 
+                feedrate=settings.spindle_feedrate_Z_hole)
+        gcode += move(MotionMode.RAPID,
+                z=settings.spindle_Z_up_position)
     gcode += '\n'
 
     # deactivating the tool PWM
@@ -729,6 +729,24 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
 
     :return: This function creates the gcode content as string according to the input coordinates
     '''
+    ### Preparations
+    # getting the list of list of path coords :D
+    # The bulk of the code is in this single line ;)
+    # Preparing Height Map
+    if settings.height_map:
+        with open(settings.height_map, 'r') as f:
+            height_map = json.load(f)
+    else:
+        height_map = None
+    coordinate_lists = get_traces_outlines(
+            gerber_obj, 
+            settings.include_edge_cuts, 
+            settings.spindle_bit_offset, 
+            height_map=height_map, 
+            Z_offset_from_0=settings.spindle_Z_down_engrave,
+            debug=settings.debug)
+
+    ### Gcode
     gcode = ''
 
     gcode += '\n; Spindle trace Spindle engraving Gcode\n\n'
@@ -748,31 +766,16 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
             PlaneSelect.XY, 
             FeedRateMode.UNIT_PER_MIN,
             comment="Setting Modal Groups")
+
+    # Starting Spindle Away from surface
+    gcode += move(MotionMode.RAPID,
+            DistanceMode.ABSOLUTE,
+            Z=2,
+            comment="Going Up from surface to start spindle")
+    gcode += set_modal_options(SpindleState.ON_CW, 
+            comment="Spindle ON CW")
+    gcode += dwell(2, comment="dwell for 2 seconds so motor reaches full RPM\n")
     
-    #TODO: add bit change code here
-    if settings.tool:
-        # Activiate Tool number 1, The Laser Module
-        gcode += tool(ToolChange.Select, settings.Tool.Laser)
-
-    # getting the list of list of path coords :D
-    # The bulk of the code is in this single line ;)
-    # Preparing Height Map
-    if settings.height_map:
-        with open(settings.height_map, 'r') as f:
-            height_map = json.load(f)
-    else:
-        height_map = None
-    coordinate_lists = get_traces_outlines(
-            gerber_obj, 
-            settings.include_edge_cuts, 
-            settings.spindle_bit_offset, 
-            height_map=height_map, 
-            Z_offset_from_0=settings.spindle_Z_down_engrave,
-            debug=settings.debug)
-
-    # Activate Spindle
-    gcode += f'\nG00Z3\nM3 ; Activate Spindle\n\n'
-
     ### PCB trace engraving Gcode
     for ind, coordinate_list in enumerate(coordinate_lists):
         gcode += f"; Engraving Trace No. {ind}\n"
@@ -809,12 +812,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
         gcode += '\n'
 
     # Deactivate End Effector Signal
-    gcode += f'\nM5 ; Disable Spindle\n\n'
-
-    # Get the tool back and deselect it
-    #TODO: add bit change code here
-    if settings.tool:
-        gcode += tool(ToolChange.Deselect, settings.Tool.Laser)
+    gcode += set_modal_options(SpindleState.OFF, comment="Disable Spindle\n")
 
     return gcode
 
