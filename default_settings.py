@@ -43,6 +43,8 @@ default_settings_dict = {
     "spindle_speed": 400,
     # Spindle Bit Offset for engraving
     "spindle_bit_offset": 0.2,
+    # spindle will move through the trace (A->B) then (B->A). This is useful for bad bits.
+    'add_spindle_trace_ccw_path': False,
 
     # ### Pen Tweaking Values
     # # Z positions

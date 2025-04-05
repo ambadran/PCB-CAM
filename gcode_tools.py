@@ -798,6 +798,11 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
         # Complete the Loop
         gcode += move(coordinate=coordinate_list[0])
 
+        # CCW spindle movement if wanted
+        if settings.add_spindle_trace_ccw_path:
+            for coordinate in coordinate_list[::-1]:
+                gcode += move(coordinate=coordinate)
+
         # Spindle Up, Stop engraving
         gcode += move(Z=settings.spindle_Z_up_position, feedrate=settings.spindle_feedrate_Z_up)
 
@@ -989,6 +994,7 @@ class GenerateHeightMap:
 
         print(f"G54 Offset: {g54_offset}\nG92 Offset: {g92_offset}\n")
         return g54_offset, g92_offset
+
 
 if __name__ == '__main__':
 
