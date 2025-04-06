@@ -398,7 +398,7 @@ def dwell(seconds: int, comment: Optional[str]=None) -> str:
     '''
     returns Gcode to dwell, (sleep for a specific amounts of seconds)
     '''
-    return f"G4 P{seconds}  ; {comment}"
+    return f"G4 P{seconds}  ; {comment}\n"
 
 
 def get_tool_func(latch_offset_distance_in: int, latch_offset_distance_out: int, tool_home_coordinates: dict[int: tuple[int, int, int]], tool_offsets: dict[int: tuple[int, int, int]], attach_detach_time: int) -> Callable:
@@ -757,7 +757,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     #  Starting Spindle and Setting the correct spindle speed
     gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
             feedrate=settings.spindle_feedrate_XY_engrave,
-            comment="Settings Non Modal Groups\n")
+            comment="Settings Non Modal Groups")
 
     # Making sure Modal Group settings are correct
     gcode += set_modal_options(MotionMode.USE_FEEDRATE, 
@@ -765,7 +765,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
             UnitMode.MM, 
             PlaneSelect.XY, 
             FeedRateMode.UNIT_PER_MIN,
-            comment="Setting Modal Groups")
+            comment="Setting Modal Groups\n")
 
     # Starting Spindle Away from surface
     gcode += move(MotionMode.RAPID,
@@ -803,6 +803,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
 
         # CCW spindle movement if wanted
         if settings.add_spindle_trace_ccw_path:
+            gcode += f"\n; Engraving Trace No. {ind} CCW\n"
             for coordinate in coordinate_list[::-1]:
                 gcode += move(coordinate=coordinate)
 

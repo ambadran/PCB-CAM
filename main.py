@@ -84,7 +84,13 @@ def main(settings: Settings):
         height_map = GenerateHeightMap(gerber_obj, settings).height_map
 
         dir_path = os.path.dirname(settings.src)
-        dir_path_with_slash = dir_path if dir_path.endswith('/') else dir_path + '/'
+        if dir_path and dir_path.endswith('/'):
+            dir_path_with_slash = dir_path
+        elif dir_path:
+            dir_path_with_slash = dir_path + '/'
+        else:
+            dir_path_with_slash = dir_path
+
         with open(dir_path_with_slash+settings.created_height_map_default_file_name, "w") as f:
             json.dump(height_map, f)
 

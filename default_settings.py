@@ -31,17 +31,17 @@ default_settings_dict = {
     ### spindle tweaking values
     # Z positions
     "spindle_Z_up_position": 1,
-    "spindle_Z_down_engrave": 0.02,
+    "spindle_Z_down_engrave": 0.04,
     "spindle_Z_down_hole": -1.6,
     # Feedrates
-    "spindle_feedrate_XY_engrave": 100,
+    "spindle_feedrate_XY_engrave": 30,
     "spindle_feedrate_Z_engrave": 30,
     "spindle_feedrate_Z_hole": 50,
     "spindle_feedrate_Z_up": 100,
     # Power intensities
     "spindle_speed": 400,
     # Dwell time in seconds for spindle to reach full RPM
-    "spindle_dwell_time": 2
+    "spindle_dwell_time": 2,
     # Spindle Bit Offset for engraving
     "spindle_bit_offset": 0.2,
     # spindle will move through the trace (A->B) then (B->A). This is useful for bad bits.
