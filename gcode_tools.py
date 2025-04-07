@@ -514,7 +514,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
     #  Starting Spindle and Setting the correct spindle speed
     gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
             feedrate=settings.spindle_feedrate_Z_hole,
-            comment="Settings Non Modal Groups\n")
+            comment="Settings Non Modal Groups")
 
     # Making sure Modal Group settings are correct
     gcode += set_modal_options(MotionMode.USE_FEEDRATE, 
@@ -522,7 +522,7 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
             UnitMode.MM, 
             PlaneSelect.XY, 
             FeedRateMode.UNIT_PER_MIN,
-            comment="Setting Modal Groups")
+            comment="Setting Modal Groups\n")
 
     # Starting Spindle Away from surface
     gcode += move(MotionMode.RAPID,
@@ -532,7 +532,6 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
     gcode += set_modal_options(SpindleState.ON_CW, 
             comment="Spindle ON CW")
     gcode += dwell(settings.spindle_dwell_time, comment="dwell for {settings.spindle_dwell_time} seconds so motor reaches full RPM\n")
-    gcode += '\n'
 
     # Cutting starts here :)
     for coordinate in coordinates:
@@ -547,10 +546,6 @@ def generate_holes_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
 
     # deactivating the tool PWM
     gcode += f'M5 ; disabling spindle PWM\n\n'
-
-    # Get the tool back to its place and deselect the tool
-    if tool:
-        gcode += tool(ToolChange.Deselect, Tool.Spindle)
 
     return gcode
 

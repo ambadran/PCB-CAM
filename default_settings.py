@@ -36,7 +36,7 @@ default_settings_dict = {
     # Feedrates
     "spindle_feedrate_XY_engrave": 30,
     "spindle_feedrate_Z_engrave": 30,
-    "spindle_feedrate_Z_hole": 50,
+    "spindle_feedrate_Z_hole": 5,
     "spindle_feedrate_Z_up": 100,
     # Power intensities
     "spindle_speed": 400,
