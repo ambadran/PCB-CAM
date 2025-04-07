@@ -725,9 +725,6 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     :return: This function creates the gcode content as string according to the input coordinates
     '''
     ### Preparations
-    # getting the list of list of path coords :D
-    # The bulk of the code is in this single line ;)
-    # Preparing Height Map
     if settings.height_map:
         with open(settings.height_map, 'r') as f:
             height_map = json.load(f)
@@ -801,7 +798,8 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
                 gcode += move(coordinate=coordinate)
 
         # Spindle Up, Stop engraving
-        gcode += move(Z=settings.spindle_Z_up_position, feedrate=settings.spindle_feedrate_Z_up)
+        gcode += move(MotionMode.RAPID,
+                      Z=settings.spindle_Z_up_position)
 
         gcode += '\n'
 
@@ -818,7 +816,7 @@ def generate_spindle_edge_cut_gcode(gerber_obj: gerber.rs274x.GerberFile, settin
     :return: This function creates the gcode content as string according to the input coordinates
     '''
     ### Preparations
-    coordinate_lists = get_spindle_edge_cut_pathways(gerber_obj, 
+    coordinate_lists = get_spindle_edge_cut_coords(gerber_obj, 
                                 settings.spindle_bit_offset)
 
     ### Gcode
@@ -852,18 +850,37 @@ def generate_spindle_edge_cut_gcode(gerber_obj: gerber.rs274x.GerberFile, settin
     gcode += dwell(2, comment="dwell for 2 seconds so motor reaches full RPM\n")
 
     ## PCB Spindle Edge cutting
-    for ind, coordinate_list in enumerate(coordinate_lists):
-        gcode += move(MotionMode.RAPID,
-                )
+    for ind, coordinate_list in enumerate(coordinate_lists1):
+        gcode += f"; Cutting Edge No. {ind}\n"
 
         # Go to start of Loop
         gcode += move(MotionMode.RAPID, 
                     coordinate=Point(coordinate_list[0].x,
-                                coordinate_list[0].y,
-                                settings.spindle_Z_up_position))
+                                    coordinate_list[0].y,
+                                    settings.spindle_Z_up_position))
 
+        # Spindle Down, Start engraving
+        gcode += move(Z=coordinate_list[0].z, feedrate=settings.spindle_feedrate_Z_engrave)
 
- 
+        # Setting engraving feedrate
+        gcode += set_non_modal_options(feedrate=settings.spindle_feedrate_XY_cutting,
+                                        comment="setting default feedrate")
+
+        # Continue Loop
+        for coordinate in coordinate_list[1:]:
+            gcode += move(coordinate=coordinate)
+
+        # Spindle Up, Stop engraving
+        gcode += move(MotionMode.RAPID,
+                      Z=settings.spindle_Z_up_position)
+
+        gcode += '\n'
+
+     # Deactivate End Effector Signal
+    gcode += set_modal_options(SpindleState.OFF, comment="Disable Spindle\n")
+
+    return gcode
+
 
 
 def export_gcode(gcode: str, file_name: str) -> None:

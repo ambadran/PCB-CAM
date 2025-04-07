@@ -24,3 +24,4 @@ __pychache__
 *.~*
 ~$*
 test/
+gerber/
