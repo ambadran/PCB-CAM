@@ -55,11 +55,11 @@ def main(settings: Settings):
     ### Main Code ###
     '''
     # Error checking the arguments
-    if settings.create_height_map and (settings.holes or settings.laser or settings.spindle):
+    if settings.create_height_map and (settings.holes or settings.laser or settings.spindle or settings.spindle_edge_cut):
         raise ValueError("can't create height map and generate PCB gcode at once!")
 
     elif not settings.create_height_map:
-        if not settings.holes and not settings.laser and not settings.spindle:
+        if not settings.holes and not settings.laser and not settings.spindle and not settings.spindle_edge_cut:
             raise ValueError("\nMust choose what Gcode to export!\nOptions:\n1- '--all-gcode' : exports all 3 gcodes\n2- '--holes' : Adds hole drilling gcode to Gcode file\n3- '--ink' : Adds ink laying gcode to Gcode file\n4- '--laser' : Adds laser drawing gcode to Gcode file")
         if settings.laser and settings.spindle:
             raise ValueError("\nCan't have two engraving methods! Please either spindle OR laser.")
@@ -136,6 +136,10 @@ def main(settings: Settings):
     if settings.holes:
         gcode += generate_holes_gcode(gerber_obj, settings)
         debug_msg += "Exported spindle hole drilling Gcode..\n"
+
+    if settings.spindle_edge_cut:
+        gcode += generate_spindle_edge_cut_gcode(gerber_obj, settings)
+        debug_msg += "Exported spindle Edge Cut Gcode..\n"
 
     # Machine Deinit
     gcode += general_machine_deinit()

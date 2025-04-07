@@ -81,6 +81,7 @@ default_settings_dict = {
     'laser': False,
     'spindle': False,
     'holes': False,
+    "spindle_edge_cut": False,
 
     # Show Gcode Creation Debugging info and visualization :)
     'debug': False,

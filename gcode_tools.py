@@ -719,7 +719,7 @@ def generate_laser_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, s
 
 def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile, settings) -> str:
     '''
-    :param gerber_file: the file that we want to get the holes coordinate from
+    :param gerber_file: the gerber file object
     :param settings: the settings parameter
 
     :return: This function creates the gcode content as string according to the input coordinates
@@ -735,7 +735,6 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
         height_map = None
     coordinate_lists = get_traces_outlines(
             gerber_obj, 
-            settings.include_edge_cuts, 
             settings.spindle_bit_offset, 
             height_map=height_map, 
             Z_offset_from_0=settings.spindle_Z_down_engrave,
@@ -771,7 +770,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
             comment="Spindle ON CW")
     gcode += dwell(2, comment="dwell for 2 seconds so motor reaches full RPM\n")
     
-    ### PCB trace engraving Gcode
+    # PCB trace engraving Gcode
     for ind, coordinate_list in enumerate(coordinate_lists):
         gcode += f"; Engraving Trace No. {ind}\n"
 
@@ -779,8 +778,7 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
         gcode += move(MotionMode.RAPID, 
                     coordinate=Point(coordinate_list[0].x,
                                     coordinate_list[0].y,
-                                    settings.spindle_Z_up_position),
-                    feedrate=settings.spindle_feedrate_XY_engrave)
+                                    settings.spindle_Z_up_position))
 
         # Spindle Down, Start engraving
         gcode += move(Z=coordinate_list[0].z, feedrate=settings.spindle_feedrate_Z_engrave)
@@ -811,6 +809,62 @@ def generate_spindle_engraving_trace_gcode(gerber_obj: gerber.rs274x.GerberFile,
     gcode += set_modal_options(SpindleState.OFF, comment="Disable Spindle\n")
 
     return gcode
+
+def generate_spindle_edge_cut_gcode(gerber_obj: gerber.rs274x.GerberFile, settings):
+    '''
+    :param gerber_file: the gerber file object
+    :param settings: the settings parameter
+
+    :return: This function creates the gcode content as string according to the input coordinates
+    '''
+    ### Preparations
+    coordinate_lists = get_spindle_edge_cut_pathways(gerber_obj, 
+                                settings.spindle_bit_offset)
+
+    ### Gcode
+    gcode = ''
+
+    gcode += '\n; Spindle trace Spindle engraving Gcode\n\n'
+
+    # Setting GRBL mode to spindle mode
+    gcode += "; Please Check $32 is equal to 0 for Spindle Mode\n\n"
+
+    #  Starting Spindle and Setting the correct spindle speed
+    gcode += set_non_modal_options(spindle_speed=settings.spindle_speed,
+            feedrate=settings.spindle_feedrate_XY_engrave,
+            comment="Settings Non Modal Groups\n")
+
+    # Making sure Modal Group settings are correct
+    gcode += set_modal_options(MotionMode.USE_FEEDRATE, 
+            DistanceMode.ABSOLUTE, 
+            UnitMode.MM, 
+            PlaneSelect.XY, 
+            FeedRateMode.UNIT_PER_MIN,
+            comment="Setting Modal Groups")
+
+    # Starting Spindle Away from surface
+    gcode += move(MotionMode.RAPID,
+            DistanceMode.ABSOLUTE,
+            Z=2,
+            comment="Going Up from surface to start spindle")
+    gcode += set_modal_options(SpindleState.ON_CW, 
+            comment="Spindle ON CW")
+    gcode += dwell(2, comment="dwell for 2 seconds so motor reaches full RPM\n")
+
+    ## PCB Spindle Edge cutting
+    for ind, coordinate_list in enumerate(coordinate_lists):
+        gcode += move(MotionMode.RAPID,
+                )
+
+        # Go to start of Loop
+        gcode += move(MotionMode.RAPID, 
+                    coordinate=Point(coordinate_list[0].x,
+                                coordinate_list[0].y,
+                                settings.spindle_Z_up_position))
+
+
+ 
+
 
 def export_gcode(gcode: str, file_name: str) -> None:
 

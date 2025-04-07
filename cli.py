@@ -100,6 +100,7 @@ if __name__ == '__main__':
     # addArg('ink', "Adds ink laying gcode to Gcode file", bool)  # deprecated
     addArg('laser', "Adds laser engraving gcode to Gcode file", bool)
     addArg('spindle', "Adds spindle engraving gcode to Gcode file", bool)
+    addArg('spindle-edge-cut', "Using Spindle to cut the edges of the PCB", bool)
 
     # Tool Head change ( kinematic mounting mechanisms / spindle bit change )
     addArg('spindle_bit_change', "Adds support for CNC machines with the ability to change spindle bits.\n(Please note that the id of bit, type and size must be defined in the default_settings file or added as an argument here.)", bool)
