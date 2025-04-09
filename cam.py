@@ -955,6 +955,10 @@ def get_pen_coords(gerber_obj: gerber.rs274x.GerberFile, debug: bool=False) -> l
     pass
 
 def get_spindle_edge_cut_coords(gerber_obj: gerber.rs274x.GerberFile, resolution: int = DEFAULT_RESOLUTION, debug: bool=False) -> list[list[Point]]:
+    '''
+
+    '''
+    pass
 
 
 if __name__ == '__main__':
