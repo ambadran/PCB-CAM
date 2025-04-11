@@ -824,7 +824,6 @@ def visualize_group(group, gbr_obj=None):
     visualize(group[-1], x_offset=x_center, y_offset=y_center, multiplier=multiplier, terminate=True)
 
 def get_traces_outlines(gerber_obj: gerber.rs274x.GerberFile, 
-        include_edge_cuts: bool, 
         offset:Optional[float] = None, 
         resolution: int = DEFAULT_RESOLUTION, 
         height_map: Optional[tuple[tuple[float, float, float]]] = None,

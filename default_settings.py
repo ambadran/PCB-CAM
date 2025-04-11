@@ -34,7 +34,7 @@ default_settings_dict = {
     "spindle_Z_down_engrave": 0.04,
     "spindle_Z_down_hole": -1.6,
     # Feedrates
-    "spindle_feedrate_XY_engrave": 30,
+    "spindle_feedrate_XY_engrave": 10,
     "spindle_feedrate_XY_cutting": 100,
     "spindle_feedrate_Z_engrave": 30,
     "spindle_feedrate_Z_hole": 5,
